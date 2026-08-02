@@ -169,6 +169,16 @@ section{padding:96px 0;scroll-margin-top:72px}
 .cap .terms span:not(:last-child)::after{content:" · ";color:var(--rule-2);white-space:normal}
 .cap .terms .key{color:var(--ink);font-weight:500}
 
+/* ---------------- lab ---------------- */
+.lab-row{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;padding:32px 0;border-bottom:1px solid var(--rule)}
+.lab-row:last-child{border-bottom:0}
+@media(max-width:820px){.lab-row{grid-template-columns:1fr;gap:12px;padding:24px 0}}
+.lab-row .try{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);text-decoration:none;border-bottom:1px solid var(--rule-2);padding-bottom:2px;transition:border-color .14s}
+.lab-row .try:hover{border-bottom-color:var(--accent)}
+.lab-row h3{font-family:var(--serif);font-size:21px;font-weight:500;color:var(--ink);line-height:1.35}
+.lab-row p{margin-top:12px;color:var(--body);max-width:37rem}
+.lab-row .tech{margin-top:12px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
 /* ---------------- education ---------------- */
 .edu-row{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;padding:24px 0;border-bottom:1px solid var(--rule);align-items:baseline}
 .edu-row:last-child{border-bottom:0}
@@ -217,6 +227,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px}
       <a href="#profile">Profile</a>
       <a href="#education">Education</a>
       <a href="#experience">Experience</a>
+      <a href="#lab">Lab</a>
       <a href="#capabilities">Capabilities</a>
       <a href="#contact">Contact</a>
     </nav>
@@ -396,10 +407,52 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px}
   </div>
 </section>
 
+<section id="lab" class="band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label rise"><span class="num">04</span> &nbsp;Lab</span>
+      <div>
+        <h2 class="rise">Three tools, built to be tried.</h2>
+        <p class="deck rise">Working tools, not screenshots. Each runs entirely in your browser on synthetic data — nothing is uploaded, and no real patient data is used anywhere.</p>
+      </div>
+    </div>
+    <div class="rows">
+
+      <article class="lab-row rise">
+        <div><a class="try" href="lab/phi-deidentifier/">Try it &rarr;</a></div>
+        <div>
+          <h3>PHI De-identification &amp; Re-identification Risk</h3>
+          <p>Paste a clinical note and every HIPAA Safe Harbor identifier is detected, categorised and redacted — then scored for the re-identification risk that survives. Safe Harbor and Limited Data Set are separate modes, because they retain different things.</p>
+          <div class="tech">45 CFR §164.514 &nbsp;·&nbsp; NPI/DEA/VIN/MBI checksums &nbsp;·&nbsp; span resolution &nbsp;·&nbsp; k-anonymity estimate</div>
+        </div>
+      </article>
+
+      <article class="lab-row rise">
+        <div><a class="try" href="lab/clinical-ai-readiness/">Try it &rarr;</a></div>
+        <div>
+          <h3>Clinical AI Readiness Assessment</h3>
+          <p>A structured go/no-go for a proposed clinical AI use case, scored across patient safety, regulatory posture, data provenance, bias, workflow fit and governance. A hard blocker overrides the total score — because a high average should never outvote "no human in the loop".</p>
+          <div class="tech">21st Century Cures Act CDS carve-out &nbsp;·&nbsp; IMDRF risk categories &nbsp;·&nbsp; weighted scoring &nbsp;·&nbsp; generated risk register</div>
+        </div>
+      </article>
+
+      <article class="lab-row rise">
+        <div><a class="try" href="lab/emr-data-quality/">Try it &rarr;</a></div>
+        <div>
+          <h3>EMR Data Quality Profiler</h3>
+          <p>Profiles an EHR-style dataset for completeness, conformance and plausibility, and rules on whether it is fit to train a model. It flags the dangerous failure specifically: missingness that correlates with a grouping variable rather than occurring at random.</p>
+          <div class="tech">Kahn data-quality framework &nbsp;·&nbsp; non-random missingness &nbsp;·&nbsp; unit-switch detection &nbsp;·&nbsp; ICD-10/CPT conformance</div>
+        </div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
 <section id="capabilities">
   <div class="wrap">
     <div class="sec-head">
-      <span class="label rise"><span class="num">04</span> &nbsp;Capabilities</span>
+      <span class="label rise"><span class="num">05</span> &nbsp;Capabilities</span>
       <div>
         <h2 class="rise">Where I'm strongest, in order.</h2>
         <p class="deck rise">Emphasis marks the tools I use weekly.</p>
@@ -457,7 +510,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px}
 <section id="contact" class="band">
   <div class="wrap">
     <div class="sec-head">
-      <span class="label rise"><span class="num">05</span> &nbsp;Contact</span>
+      <span class="label rise"><span class="num">06</span> &nbsp;Contact</span>
       <div>
         <h2 class="rise">Open to AI product roles in healthcare.</h2>
         <p class="deck rise">AI product manager, technical product manager and healthcare AI positions. Email reaches me fastest.</p>

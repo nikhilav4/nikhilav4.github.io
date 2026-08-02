@@ -1,0 +1,1559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PHI De-identification &amp; Re-identification Risk — Nikhila Veeramalla</title>
+<meta name="description" content="A working HIPAA Safe Harbor de-identification engine: 18 identifier categories detected by layered regex, gazetteer and context rules, then a computed k-anonymity-style re-identification risk score. Synthetic data only. Demonstration, not a compliance control.">
+<meta name="theme-color" content="#fbfaf8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%236b4e12'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='33' font-weight='600' fill='%23fbfaf8' text-anchor='middle'%3ENV%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fbfaf8; --band:#f3f1eb; --ink:#14120f; --body:#3c3630; --muted:#6f675d;
+  --rule:#e2ded4; --rule-2:#cfc9bc; --accent:#6b4e12;
+  --ok:#1f5d3a; --warn:#8a5a12; --bad:#8c2f24;
+  --rail:180px; --max:1160px; --gut:32px;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);color:var(--body);
+  font-family:var(--sans);font-size:17px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:var(--accent);color:var(--paper)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+@media(max-width:640px){:root{--gut:24px}}
+
+h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:400;letter-spacing:-.018em}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.02;font-weight:300;letter-spacing:-.032em}
+h2{font-size:clamp(21px,3.2vw,40px);line-height:1.16}
+h3{font-size:21px;line-height:1.35;font-weight:500}
+p{max-width:37rem}
+
+.label,.eyebrow{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+}
+.label .num{color:var(--accent)}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.nums{font-variant-numeric:tabular-nums lining-nums}
+
+/* ---------------- masthead ---------------- */
+.mast{border-bottom:1px solid var(--rule)}
+.mast-in{max-width:var(--max);margin:0 auto;padding:16px var(--gut);display:flex;align-items:center;justify-content:space-between;gap:24px}
+.mast a.back{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;
+  transition:color .14s,border-color .14s;
+}
+.mast a.back:hover{color:var(--ink);border-bottom-color:var(--accent)}
+.mast .toolname{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);text-align:right}
+
+/* ---------------- buttons ---------------- */
+.act{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  text-decoration:none;color:var(--ink);
+  padding:12px 20px;border:1px solid var(--rule-2);background:transparent;
+  cursor:pointer;transition:background .14s,color .14s,border-color .14s;
+}
+.act:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.act.solid,.act[aria-pressed="true"]{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.act.solid:hover,.act[aria-pressed="true"]:hover{background:var(--ink);border-color:var(--ink)}
+.acts{display:flex;flex-wrap:wrap;gap:12px}
+
+/* ---------------- sections ---------------- */
+section{padding:72px 0}
+@media(max-width:900px){section{padding:56px 0}}
+.tint{background:var(--band);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.sec-head{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;align-items:baseline;padding-bottom:32px;border-bottom:1px solid var(--rule)}
+@media(max-width:820px){.sec-head{grid-template-columns:1fr;gap:16px}}
+.sec-head .deck{color:var(--muted);margin-top:16px}
+
+/* ---------------- title block ---------------- */
+.title-block{padding:72px 0 56px}
+@media(max-width:900px){.title-block{padding:56px 0 40px}}
+.standfirst{display:flex;align-items:center;gap:16px;margin-bottom:32px}
+.standfirst .bar{width:40px;height:1px;background:var(--accent);flex:none}
+.title-block h1{max-width:20ch}
+.title-block .lede{margin-top:32px;padding-top:24px;border-top:1px solid var(--rule);color:var(--body);max-width:40rem}
+
+/* ---------------- steps ---------------- */
+.steps{margin-top:40px;border-top:1px solid var(--rule)}
+.step{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;padding:24px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+@media(max-width:820px){.step{grid-template-columns:1fr;gap:8px}}
+.step .n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.step .t{color:var(--body);max-width:44rem}
+.step .t strong{font-weight:500;color:var(--ink)}
+.step .t code{font-family:var(--mono);font-size:14px;color:var(--ink)}
+
+/* ---------------- notices ---------------- */
+.notice{border:1px solid var(--rule-2);background:var(--band);padding:24px;margin-top:24px}
+.notice .stamp{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.13em;text-transform:uppercase;line-height:1.7;color:var(--accent);max-width:none}
+.notice .gloss{font-size:14px;line-height:1.6;color:var(--body);margin-top:8px;max-width:64rem}
+.notice .gloss + .stamp{margin-top:16px}
+
+/* ---------------- tool chrome ---------------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end;justify-content:space-between;margin-top:32px}
+.ctrl{display:flex;flex-direction:column;gap:8px}
+.ctrl .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.seg{display:flex}
+.seg .act{border-right-width:0}
+.seg .act:last-child{border-right-width:1px}
+.confirm{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ok);min-height:16px;margin-top:12px;display:block}
+
+textarea{
+  width:100%;min-height:280px;margin-top:16px;
+  font-family:var(--mono);font-size:14px;line-height:1.7;color:var(--ink);
+  background:var(--paper);border:1px solid var(--rule-2);padding:16px;resize:vertical;
+}
+.offscreen{position:fixed;top:0;left:0;height:1px;width:1px;opacity:0;border:0;padding:0}
+
+/* ---------------- panes ---------------- */
+.panes{display:grid;grid-template-columns:1fr 1fr;margin-top:24px;border:1px solid var(--rule);border-bottom:0}
+@media(max-width:820px){.panes{grid-template-columns:1fr}}
+.pane{padding:16px;border-bottom:1px solid var(--rule);min-width:0}
+.pane + .pane{border-left:1px solid var(--rule)}
+@media(max-width:820px){.pane + .pane{border-left:0;border-top:1px solid var(--rule)}}
+.pane h3{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:16px}
+.out{
+  font-family:var(--mono);font-size:14px;line-height:1.8;color:var(--body);
+  white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;
+  max-height:440px;overflow-y:auto;overflow-x:hidden;
+}
+mark.hit{background:var(--band);color:var(--ink);border-bottom:1px solid var(--accent)}
+mark.tok{background:var(--band);color:var(--accent);border-bottom:1px solid var(--accent);font-weight:500}
+mark.keep{background:transparent;color:var(--body);border-bottom:1px dotted var(--rule-2)}
+.legend{display:flex;flex-wrap:wrap;gap:24px;margin-top:16px;font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------------- figures ---------------- */
+.figs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin-top:32px}
+@media(max-width:820px){.figs{grid-template-columns:repeat(2,1fr)}}
+.figc{padding:16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.figc .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.figc .v{font-family:var(--serif);font-size:40px;line-height:1.1;color:var(--accent);letter-spacing:-.02em;font-variant-numeric:tabular-nums lining-nums;margin-top:12px}
+@media(max-width:520px){.figc .v{font-size:21px}}
+
+/* ---------------- tables ---------------- */
+.tscroll{overflow-x:auto;border:1px solid var(--rule);margin-top:24px}
+table{border-collapse:collapse;width:100%;min-width:860px}
+table.narrow{min-width:520px}
+th{
+  font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:12px 16px;border-bottom:1px solid var(--rule-2);white-space:nowrap;
+  background:var(--band);
+}
+td{font-size:14px;line-height:1.6;padding:12px 16px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.m{font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+td.n{font-variant-numeric:tabular-nums lining-nums;font-family:var(--mono);font-size:11px;white-space:nowrap}
+td.cat{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+td .span{font-family:var(--mono);font-size:14px;color:var(--ink);background:var(--band);padding:0 8px}
+td .rep{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--accent)}
+td .why{display:block;margin-top:8px;font-size:14px;color:var(--muted);line-height:1.5;max-width:46ch}
+.c-high{color:var(--ok)}
+.c-medium{color:var(--warn)}
+.c-low{color:var(--muted)}
+
+/* ---------------- coverage ---------------- */
+.cov{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin-top:24px}
+@media(max-width:900px){.cov{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.cov{grid-template-columns:1fr}}
+.covi{padding:12px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);display:flex;gap:12px;align-items:baseline}
+.covi .cn{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--rule-2);font-variant-numeric:tabular-nums lining-nums;flex:none}
+.covi .cl{font-size:14px;line-height:1.45;color:var(--muted);flex:1}
+.covi .cc{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);font-variant-numeric:tabular-nums lining-nums;flex:none}
+.covi.on{background:var(--band)}
+.covi.on .cn{color:var(--accent)}
+.covi.on .cl{color:var(--ink)}
+.covi.on .cc{color:var(--accent)}
+
+/* ---------------- risk ---------------- */
+.risk{border:1px solid var(--rule-2);margin-top:24px}
+.risk + .sec-head{margin-top:72px}
+.risk-head{display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;padding:24px;border-bottom:1px solid var(--rule)}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;padding:8px 12px;border:1px solid var(--rule-2);color:var(--ink);white-space:nowrap}
+.chip.ok{border-color:var(--ok);color:var(--ok)}
+.chip.warn{border-color:var(--warn);color:var(--warn)}
+.chip.bad{border-color:var(--bad);color:var(--bad)}
+.risk-k{font-family:var(--serif);font-size:40px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums lining-nums;letter-spacing:-.02em}
+.risk-body{padding:24px}
+.risk-body p{max-width:46rem}
+.risk-body p + p{margin-top:16px}
+/* The meter carries 11px mono labels. Scaling the whole SVG down to a 380px
+   column would render them at ~5px, so it keeps its drawing width and scrolls
+   inside its own container — same contract as the tables. */
+.mscroll{overflow-x:auto;margin:24px 0 8px}
+.meter{display:block;width:100%;min-width:720px;height:auto}
+.meter text{font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.meter .ax{fill:var(--muted)}
+.meter .zn{fill:var(--ink)}
+.meter .mk{fill:var(--accent)}
+.foot-note{margin-top:24px;padding-top:16px;border-top:1px solid var(--rule);color:var(--muted);font-size:14px;line-height:1.6;max-width:46rem}
+
+.queue{margin-top:24px;border-top:1px solid var(--rule)}
+.qi{padding:16px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;align-items:baseline}
+@media(max-width:820px){.qi{grid-template-columns:1fr;gap:8px}}
+.qi .qk{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent)}
+.qi .qv{font-size:14px;line-height:1.6;color:var(--body)}
+.qi .qv code{font-family:var(--mono);background:var(--band);padding:0 8px;color:var(--ink)}
+
+.prose{margin-top:32px}
+.prose p{max-width:44rem}
+.prose p + p{margin-top:16px}
+.prose strong{font-weight:500;color:var(--ink)}
+
+footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:0}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+
+@media(prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <div class="mast-in">
+    <a class="back" href="../../">Nikhila Veeramalla</a>
+    <div class="toolname">PHI De-identification &amp; Re-identification Risk</div>
+  </div>
+</div>
+
+<header class="title-block">
+  <div class="wrap">
+    <div class="standfirst">
+      <span class="bar"></span>
+      <span class="eyebrow">Lab &nbsp;/&nbsp; 45 CFR §164.514</span>
+    </div>
+    <h1>What survives a Safe Harbor redaction.</h1>
+    <p class="lede">Paste a clinical note and watch every HIPAA Safe Harbor identifier come out of it, category by category — then read the re-identification risk that survives. Built for product managers who have to defend a de-identification pipeline to compliance.</p>
+  </div>
+</header>
+
+<main>
+
+<section class="tint">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">01</span> &nbsp;How it works</span>
+      <div>
+        <h2>Six passes, no black box.</h2>
+        <p class="deck">Every rule below runs in your browser on the text in the box. Nothing is sent anywhere and nothing is pre-computed.</p>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">Step 01</div>
+        <div class="t"><strong>Layered detection against §164.514(b)(2).</strong> Three detector families run over the raw text: deterministic regular expressions for structured identifiers, gazetteers for names, cities and states, and context rules that fire on a trigger phrase and redact only the value that follows it — so <code>MRN:</code> survives and the number does not.</div>
+      </div>
+      <div class="step">
+        <div class="n">Step 02</div>
+        <div class="t"><strong>Checksum validation, not shape-matching.</strong> Candidates are confirmed arithmetically where a published check exists: <strong>VIN</strong> position-9 check digit (ISO 3779), <strong>DEA</strong> registrant checksum, <strong>NPI</strong> Luhn over the 80840 prefix, <strong>CMS MBI</strong> positional format, and the SSA issuance rules that bar area 000, 666 and 900–999. A candidate that fails its check is still redacted, but drops to lower confidence and says so.</div>
+      </div>
+      <div class="step">
+        <div class="n">Step 03</div>
+        <div class="t"><strong>Span resolution.</strong> Overlapping candidates are resolved by rule specificity, then span length — so a full street address wins over the bare road name inside it, and a validated MBI wins over the generic alphanumeric-code net. Suppressed candidates are counted, not silently dropped.</div>
+      </div>
+      <div class="step">
+        <div class="n">Step 04</div>
+        <div class="t"><strong>Transformation under the selected method.</strong> <strong>Safe Harbor</strong> §164.514(b)(2) strips all 18 categories, keeps the initial three ZIP digits unless the prefix is on the restricted-population list, keeps years, and aggregates ages over 89 to 90+. <strong>Limited Data Set</strong> §164.514(e)(2) removes only the 16 enumerated direct identifiers and retains full dates, city, state and 5-digit ZIP.</div>
+      </div>
+      <div class="step">
+        <div class="n">Step 05</div>
+        <div class="t"><strong>Residual risk by equivalence class.</strong> The surviving quasi-identifiers — geography, sex, birth granularity — are multiplied against a stated population denominator to estimate <em>k</em>, the expected number of people sharing the released combination. Every constant in that arithmetic is printed on the page.</div>
+      </div>
+      <div class="step">
+        <div class="n">Step 06</div>
+        <div class="t"><strong>Seeded human-review queue.</strong> A reproducible sample of the weakest detections is drawn with a mulberry32 PRNG seeded from a hash of the input, so two reviewers looking at the same note get the same queue. Nothing on this page calls the platform’s unseeded random source.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">02</span> &nbsp;The tool</span>
+      <div>
+        <h2>De-identify a note.</h2>
+        <p class="deck">Edit the text and the analysis re-runs 200 ms after you stop typing.</p>
+      </div>
+    </div>
+
+    <div class="notice">
+      <p class="stamp">Synthetic records. No real patient data is used anywhere in this tool.</p>
+      <p class="gloss">Both notes were written for this demonstration; every name, number and address in them is invented.</p>
+      <p class="stamp">Demonstration only. Not validated for clinical or compliance use.</p>
+      <p class="gloss">This is not a certified compliance control, not a medical device, and not a substitute for expert determination or a qualified privacy officer.</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="ctrl">
+        <span class="k" id="modelab">De-identification method</span>
+        <div class="seg" role="group" aria-labelledby="modelab">
+          <button type="button" class="act" id="m-sh" aria-pressed="true">Safe Harbor</button>
+          <button type="button" class="act" id="m-lds" aria-pressed="false">Limited Data Set</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <span class="k" id="samplab">Input</span>
+        <div class="acts" role="group" aria-labelledby="samplab">
+          <button type="button" class="act" id="s-1">Load sample: discharge summary</button>
+          <button type="button" class="act" id="s-2">Load sample: referral letter</button>
+          <button type="button" class="act" id="s-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <label class="mono" for="src" id="srclab">Clinical free text — synthetic</label>
+    <textarea id="src" spellcheck="false" aria-labelledby="srclab"></textarea>
+
+    <div class="acts">
+      <button type="button" class="act solid" id="copy">Copy de-identified text</button>
+    </div>
+    <span class="confirm" id="confirm" role="status" aria-live="polite"></span>
+
+    <div class="panes">
+      <div class="pane">
+        <h3>Original — detections highlighted</h3>
+        <div class="out" id="pane-orig"></div>
+      </div>
+      <div class="pane">
+        <h3 id="pane-deid-h">De-identified output</h3>
+        <div class="out" id="pane-deid"></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span>Redaction token — band fill, accent underline</span>
+      <span>Dotted underline — detected but lawfully retained</span>
+    </div>
+
+    <div class="figs">
+      <div class="figc"><div class="k">Identifiers found</div><div class="v nums" id="f-found">0</div></div>
+      <div class="figc"><div class="k">Categories triggered</div><div class="v nums" id="f-cats">0 / 18</div></div>
+      <div class="figc"><div class="k">Characters redacted</div><div class="v nums" id="f-chars">0</div></div>
+      <div class="figc"><div class="k">Est. equivalence class k</div><div class="v nums" id="f-k">—</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="tint">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">03</span> &nbsp;Detections</span>
+      <div>
+        <h2>Every span, and the rule that fired.</h2>
+        <p class="deck" id="det-deck"></p>
+      </div>
+    </div>
+    <div class="tscroll">
+      <table id="det-table">
+        <thead><tr><th>#</th><th>Category</th><th>Span</th><th>Confidence</th><th>Rule fired</th><th>Replacement</th></tr></thead>
+        <tbody id="det-body"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">04</span> &nbsp;Category coverage</span>
+      <div>
+        <h2>All eighteen, scored.</h2>
+        <p class="deck">The full §164.514(b)(2)(i) list. Categories found in this note are marked in accent; categories clean in this note are muted — clean means <em>not present</em>, never <em>not checked</em>.</p>
+      </div>
+    </div>
+    <div class="cov" id="cov"></div>
+  </div>
+</section>
+
+<section class="tint">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">05</span> &nbsp;Residual risk</span>
+      <div>
+        <h2>Safe Harbor is not zero-risk.</h2>
+        <p class="deck">De-identification removes identifiers. It does not remove the quasi-identifiers that let an adversary link a record back to a person through an external register — a voter roll, an obituary, a local news report.</p>
+      </div>
+    </div>
+
+    <div class="risk">
+      <div class="risk-head">
+        <div>
+          <div class="mono">Re-identification risk band</div>
+          <div class="risk-k nums" id="r-k">—</div>
+        </div>
+        <div class="chip" id="r-chip">—</div>
+      </div>
+      <div class="risk-body">
+        <p id="r-sentence"></p>
+        <div class="mscroll">
+          <svg class="meter" id="r-meter" viewBox="0 0 720 104" role="img" aria-labelledby="r-meter-t"><title id="r-meter-t">Estimated equivalence class size on a logarithmic scale, with the high, moderate and low bands labelled</title></svg>
+        </div>
+        <div class="tscroll">
+          <table class="narrow">
+            <thead><tr><th>Quasi-identifier</th><th>Released value</th><th>Factor</th><th>Basis</th></tr></thead>
+            <tbody id="r-body"></tbody>
+          </table>
+        </div>
+        <p class="foot-note" id="r-math"></p>
+        <p class="foot-note">Bands follow common de-identification practice: <strong>k &lt; 5</strong> is treated as high risk, and <strong>k ≥ 11</strong> as low, matching the CMS cell-size suppression convention that cells of 10 or fewer are too small to release. A low band here means the modelled combination is common — not that the record is safe. Safe Harbor is a regulatory safe harbor, not a mathematical guarantee; HHS's own de-identification guidance describes the residual risk as very small but explicitly non-zero, and offers Expert Determination under §164.514(b)(1) as the alternative route.</p>
+      </div>
+    </div>
+
+    <div class="sec-head" id="q-head">
+      <span class="label"><span class="num">06</span> &nbsp;Human review queue</span>
+      <div>
+        <h2>Where a person still has to look.</h2>
+        <p class="deck">A reproducible sample of the weakest detections, drawn with a seeded PRNG so the same note always produces the same queue. Confirm each one before release.</p>
+      </div>
+    </div>
+    <div class="queue" id="queue"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">07</span> &nbsp;Method &amp; limitations</span>
+      <div><h2>What this catches, and what it does not.</h2></div>
+    </div>
+    <div class="prose">
+      <p><strong>What it catches.</strong> Identifiers with deterministic shape — SSN, telephone, fax, email, URL, IPv4 and IPv6, ZIP and dates in six formats — plus checksum-validated VIN, DEA, NPI and CMS MBI values, context-anchored MRN, plan, account, licence and device numbers, and names from a <span id="lim-gaz">—</span> gazetteer with title, relation and signature rules.</p>
+      <p><strong>What it misses.</strong> Names outside the gazetteer with no title or relation cue; misspellings, OCR noise and nicknames; dictation without punctuation; non-US formats; and most of category 18, whose <em>characteristics</em> no regular expression can enumerate. Ambiguity-prone surnames (Ward, Green, King) are excluded to protect precision. Payer and facility names are not enumerated identifiers and are kept, though in a small catchment they re-identify. Ambiguous numeric dates are read US-first.</p>
+      <p><strong>What production adds.</strong> A clinical NER model fine-tuned on an annotated corpus such as i2b2/UTHealth, ensembled with these rules rather than replacing them; a per-institution term list; surrogate generation instead of bracket tokens; and measured recall on a held-out gold set, because an unmeasured pipeline is an unquantified breach.</p>
+      <p><strong>Where a human stays.</strong> Every low-confidence span, every category-18 flag, and every note reported clean. The restricted ZIP list is the 17-prefix HHS list from Census 2000; refresh it before real use.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>Nikhila Veeramalla — AI Product Manager, Healthcare</div>
+    <div>Synthetic data · Demonstration only</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* =====================================================================
+   0. FIXED CONSTANTS — nothing here is random, nothing is fetched
+   ===================================================================== */
+
+/* A fixed reference date keeps age arithmetic reproducible across sessions. */
+var REF_YEAR = 2026, REF_MONTH = 3, REF_DAY = 1;
+
+/* Restricted 3-digit ZIP prefixes: geographic units of 20,000 people or fewer,
+   which §164.514(b)(2)(i)(B) requires be changed to 000. This is the 17-prefix
+   list published in HHS de-identification guidance from Census 2000 data. */
+var RESTRICTED_ZIP3 = ["036","059","063","102","203","556","692","790","821",
+                       "823","830","831","878","879","884","890","893"];
+
+/* Population model. Every denominator is either derived from a published
+   figure or flagged as a deliberately conservative modelling constant. */
+var POP = {
+  US:    {n: 335000000, basis: "US resident population, order of magnitude"},
+  STATE: {n: 6700000,   basis: "US population / 50 states"},
+  COUNTY:{n: 106600,    basis: "US population / 3,143 counties"},
+  ZIP3:  {n: 20000,     basis: "Safe Harbor floor: a retainable 3-digit ZIP area exceeds 20,000 people"},
+  ZIP5:  {n: 5000,      basis: "conservative: mean ZCTA is ~10,000 but the distribution is strongly right-skewed"},
+  CITY:  {n: 30000,     basis: "conservative modelling constant for a named city"}
+};
+
+var P_SEX      = 0.5;      /* two near-equal categories */
+var P_BIRTHYR  = 1/90;     /* 90 single-year birth cohorts */
+var P_AGE_EXACT= 1/90;     /* single year of age, 0-89 */
+var P_AGE_90P  = 0.007;    /* approx. share of the US population aged 90 or over */
+var P_FULL_DOB = 1/32850;  /* 90 years x 365 days */
+
+/* =====================================================================
+   1. SEEDED PRNG — mulberry32. No unseeded randomness anywhere here.
+   ===================================================================== */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function fnv1a(s){
+  var h = 0x811c9dc5;
+  for (var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+
+/* =====================================================================
+   2. CHECKSUM VALIDATORS
+   ===================================================================== */
+function luhn(num){
+  var sum = 0, alt = false;
+  for (var i = num.length - 1; i >= 0; i--){
+    var d = num.charCodeAt(i) - 48;
+    if (d < 0 || d > 9) return false;
+    if (alt){ d *= 2; if (d > 9) d -= 9; }
+    sum += d; alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+/* NPI: 10 digits beginning 1 or 2, Luhn-valid once prefixed with 80840. */
+function isNPI(n){ return /^[12]\d{9}$/.test(n) && luhn("80840" + n); }
+
+/* DEA: two letters then 7 digits; (d1+d3+d5) + 2*(d2+d4+d6) ends in d7. */
+function isDEA(s){
+  s = s.toUpperCase();
+  if (!/^[ABCDEFGHJKLMNPRSTUVWX][A-Z]\d{7}$/.test(s)) return false;
+  var d = s.slice(2).split("").map(Number);
+  var sum = (d[0] + d[2] + d[4]) + 2 * (d[1] + d[3] + d[5]);
+  return (sum % 10) === d[6];
+}
+
+/* VIN: ISO 3779 position-9 check digit. */
+var VIN_MAP = {A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,J:1,K:2,L:3,M:4,N:5,P:7,R:9,S:2,T:3,U:4,V:5,W:6,X:7,Y:8,Z:9};
+var VIN_W = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2];
+function isVIN(v){
+  v = v.toUpperCase();
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return false;
+  var sum = 0;
+  for (var i=0;i<17;i++){
+    var c = v.charAt(i);
+    var n = (c >= "0" && c <= "9") ? (c.charCodeAt(0) - 48) : VIN_MAP[c];
+    if (n === undefined) return false;
+    sum += n * VIN_W[i];
+  }
+  var r = sum % 11, chk = (r === 10) ? "X" : String(r);
+  return v.charAt(8) === chk;
+}
+
+/* CMS Medicare Beneficiary Identifier: 11 characters, position-constrained,
+   alphabetic positions exclude S, L, O, I, B and Z. */
+var MBI_ALPHA = "ACDEFGHJKMNPQRTUVWXY";
+function isMBI(raw){
+  var s = raw.toUpperCase().replace(/-/g, "");
+  if (s.length !== 11) return false;
+  function num(c){ return c >= "0" && c <= "9"; }
+  function al(c){ return MBI_ALPHA.indexOf(c) >= 0; }
+  function an(c){ return num(c) || al(c); }
+  return /[1-9]/.test(s.charAt(0)) && al(s.charAt(1)) && an(s.charAt(2)) &&
+         num(s.charAt(3)) && al(s.charAt(4)) && an(s.charAt(5)) &&
+         num(s.charAt(6)) && al(s.charAt(7)) && al(s.charAt(8)) &&
+         num(s.charAt(9)) && num(s.charAt(10));
+}
+
+/* SSA issuance rules: area is never 000, 666 or 900-999; group never 00;
+   serial never 0000. Randomisation (2011) removed geography, not these bars. */
+function ssnValid(a,g,s){
+  return !(a === "000" || a === "666" || a.charAt(0) === "9") && g !== "00" && s !== "0000";
+}
+
+function isIPv6(s){
+  if (s.indexOf(":") < 0) return false;
+  var dbl = s.indexOf("::");
+  if (dbl !== s.lastIndexOf("::")) return false;
+  var parts, i;
+  if (dbl < 0){
+    parts = s.split(":");
+    if (parts.length !== 8) return false;
+    for (i=0;i<8;i++){ if (!/^[0-9A-Fa-f]{1,4}$/.test(parts[i])) return false; }
+    return true;
+  }
+  var halves = s.split("::");
+  var left = halves[0] ? halves[0].split(":") : [];
+  var right = halves[1] ? halves[1].split(":") : [];
+  if (left.length + right.length > 7) return false;
+  var all = left.concat(right);
+  for (i=0;i<all.length;i++){ if (!/^[0-9A-Fa-f]{1,4}$/.test(all[i])) return false; }
+  return true;
+}
+
+/* =====================================================================
+   3. GAZETTEERS
+   ===================================================================== */
+var GIVEN = ("James Robert John Michael David William Richard Joseph Thomas Charles Christopher Daniel "+
+"Matthew Anthony Donald Steven Andrew Joshua Kenneth Kevin Brian George Timothy Ronald Edward Jason "+
+"Jeffrey Ryan Jacob Gary Nicholas Eric Jonathan Stephen Larry Justin Scott Brandon Benjamin Samuel "+
+"Gregory Alexander Patrick Dennis Jerry Tyler Aaron Jose Adam Nathan Henry Zachary Douglas Peter Kyle "+
+"Ethan Jeremy Walter Keith Roger Sean Gerald Harold Dylan Arthur Lawrence Jordan Jesse Bryan Gabriel "+
+"Juan Logan Albert Elijah Wayne Randy Vincent Mason Ralph Russell Bradley Philip Eugene Marcus Alan "+
+"Eleanor Harriet Priya Rajesh Anil Sunita Kavita Amara Chidi Adaeze Ngozi Kwame Hiroshi Yuki Ahmed "+
+"Fatima Omar Layla Ivan Olga Dmitri Sofia Mateo Camila Diego Valentina Mary Patricia Jennifer Linda "+
+"Elizabeth Barbara Susan Jessica Sarah Karen Nancy Lisa Betty Margaret Sandra Ashley Kimberly Emily "+
+"Donna Michelle Amanda Melissa Deborah Stephanie Rebecca Laura Sharon Cynthia Kathleen Angela Anna "+
+"Brenda Pamela Nicole Katherine Samantha Christine Catherine Virginia Debra Rachel Janet Emma Carolyn "+
+"Maria Heather Diane Julie Joyce Evelyn Victoria Kelly Christina Lauren Judith Olivia Frances Martha "+
+"Cheryl Megan Andrea Hannah Jacqueline Alice Kathryn Gloria Teresa Doris Janice Julia Marie Madison").split(/\s+/);
+
+var SURNAME = ("Smith Johnson Williams Jones Garcia Miller Davis Rodriguez Martinez Hernandez Lopez "+
+"Gonzalez Wilson Anderson Thomas Taylor Moore Jackson Martin Perez Thompson Harris Sanchez Clark "+
+"Ramirez Lewis Robinson Walker Wright Scott Torres Nguyen Flores Adams Nelson Baker Rivera Campbell "+
+"Mitchell Carter Roberts Gomez Phillips Evans Turner Diaz Parker Cruz Edwards Collins Reyes Stewart "+
+"Morris Morales Murphy Rogers Gutierrez Ortiz Morgan Cooper Peterson Bailey Reed Kelly Howard Ramos "+
+"Cox Richardson Watson Brooks Chavez Bennett Mendoza Ruiz Hughes Alvarez Castillo Sanders Patel Myers "+
+"Ross Foster Jimenez Powell Jenkins Perry Russell Sullivan Coleman Butler Henderson Barnes Gonzales "+
+"Vasquez Simmons Romero Patterson Alexander Hamilton Graham Reynolds Griffin Wallace Delgado "+
+"Raghunathan Whitfield Osei Okafor Adeyemi Chen Wang Zhang Liu Yamamoto Tanaka Singh Sharma Iyer "+
+"Veeramalla Kowalski Novak Dubois Rossi Schmidt Fernandes Abadi Haddad Nakamura Petrov Larsen").split(/\s+/);
+
+var CITIES = ("New York|Los Angeles|Chicago|Houston|Phoenix|Philadelphia|San Antonio|San Diego|Dallas|"+
+"San Jose|Austin|Jacksonville|Fort Worth|Columbus|Charlotte|San Francisco|Indianapolis|Seattle|Denver|"+
+"Boston|Nashville|Detroit|Portland|Memphis|Louisville|Milwaukee|Baltimore|Albuquerque|Tucson|Fresno|"+
+"Sacramento|Atlanta|Kansas City|Colorado Springs|Omaha|Raleigh|Miami|Cleveland|Tulsa|Oakland|"+
+"Minneapolis|Wichita|Arlington|Bakersfield|Tampa|Aurora|Honolulu|Anaheim|Santa Ana|Corpus Christi|"+
+"Riverside|St. Louis|Lexington|Pittsburgh|Anchorage|Stockton|Cincinnati|Saint Paul|Toledo|Newark|"+
+"Greensboro|Plano|Henderson|Lincoln|Buffalo|Fort Wayne|Jersey City|Chula Vista|Orlando|"+
+"St. Petersburg|Norfolk|Chandler|Laredo|Durham|Lubbock|Winston-Salem|Garland|Glendale|Hialeah|Reno|"+
+"Baton Rouge|Irvine|Chesapeake|Irving|Scottsdale|North Las Vegas|Fremont|Gilbert|San Bernardino|"+
+"Boise|Birmingham|Rochester|Richmond|Spokane|Des Moines|Montgomery|Modesto|Fayetteville|Tacoma|"+
+"Shreveport|Fontana|Oxnard|Akron|Huntington Beach|Little Rock|Amarillo|Grand Rapids|Salt Lake City|"+
+"Augusta|Knoxville|Worcester|Newport News|Brownsville|Overland Park|Providence|Dearborn|Ann Arbor|"+
+"Lansing|Flint|Ypsilanti|Livonia|Southfield|Royal Oak|Westland|Charlestown|New Haven|Hartford|"+
+"Concord|Manchester|Nashua|Burlington|Portsmouth|Bangor").split("|");
+
+var STATE_ABBR = ("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV "+
+"NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC").split(" ");
+var STATE_FULL = ("Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|"+
+"Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|"+
+"Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|"+
+"New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|"+
+"South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming").split("|");
+
+var NAME_SET = {};
+(function(){
+  var i;
+  for (i=0;i<GIVEN.length;i++) NAME_SET[GIVEN[i]] = 1;
+  for (i=0;i<SURNAME.length;i++) NAME_SET[SURNAME[i]] = 1;
+})();
+var GAZ_COUNT = Object.keys(NAME_SET).length;
+
+/* Name character classes. Clinical corpora are full of accented and
+   hyphenated names; a bare [A-Z][a-z]+ splits "Zoe Muller-Lopez" mid-token
+   and leaks the remainder into the output. \p{L} would need the /u flag
+   across every pattern here, so the Latin-1 ranges are spelled out. */
+var NU = "A-Z\\u00C0-\\u00D6\\u00D8-\\u00DE";
+var NL = "a-z\\u00DF-\\u00F6\\u00F8-\\u00FF";
+/* one name token: O'Brien, D'Angelo, McDonald, Muller-Lopez, Zoe */
+var NAMETOK = "(?:[" + NU + "]['\\u2019])?[" + NU + "][" + NL + "]+(?:['\\u2019\\-]?[" + NU + "][" + NL + "]+)*";
+var FULLNAME = "(?:" + NAMETOK + ")(?:\\s+(?:" + NAMETOK + "))?";
+var STREETWORD = "[" + NU + "][" + NU + NL + "'.]+";
+
+function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+/* longest alternative first, so "New York" wins over "York" */
+function altBody(list){
+  return list.slice().sort(function(a,b){ return b.length - a.length; }).map(esc).join("|");
+}
+function altRe(list, flags){ return new RegExp("\\b(?:" + altBody(list) + ")\\b", flags); }
+var CITY_ALT  = altBody(CITIES);
+var RE_NAMES  = altRe(Object.keys(NAME_SET), "g");
+var RE_CITIES = altRe(CITIES, "g");
+var RE_STATEF = altRe(STATE_FULL, "g");
+
+/* =====================================================================
+   4. THE 18 CATEGORIES OF §164.514(b)(2)(i)
+   ===================================================================== */
+var CATS = [
+  {n:1,  id:"NAME",      label:"Names",                                    token:"[NAME]"},
+  {n:2,  id:"GEO",       label:"Geographic subdivisions smaller than a state", token:"[GEO]"},
+  {n:3,  id:"DATE",      label:"Dates — all elements smaller than a year",  token:"[DATE]"},
+  {n:4,  id:"PHONE",     label:"Telephone numbers",                        token:"[PHONE]"},
+  {n:5,  id:"FAX",       label:"Fax numbers",                              token:"[FAX]"},
+  {n:6,  id:"EMAIL",     label:"Email addresses",                          token:"[EMAIL]"},
+  {n:7,  id:"SSN",       label:"Social security numbers",                  token:"[SSN]"},
+  {n:8,  id:"MRN",       label:"Medical record numbers",                   token:"[MRN]"},
+  {n:9,  id:"PLAN",      label:"Health plan beneficiary numbers",          token:"[HEALTH-PLAN-ID]"},
+  {n:10, id:"ACCOUNT",   label:"Account numbers",                          token:"[ACCOUNT]"},
+  {n:11, id:"LICENSE",   label:"Certificate / licence numbers",            token:"[LICENCE]"},
+  {n:12, id:"VEHICLE",   label:"Vehicle identifiers, VIN, licence plate",  token:"[VEHICLE-ID]"},
+  {n:13, id:"DEVICE",    label:"Device identifiers and serial numbers",    token:"[DEVICE-ID]"},
+  {n:14, id:"URL",       label:"Web URLs",                                 token:"[URL]"},
+  {n:15, id:"IP",        label:"IP addresses",                             token:"[IP]"},
+  {n:16, id:"BIOMETRIC", label:"Biometric identifiers",                    token:"[BIOMETRIC-REF]"},
+  {n:17, id:"PHOTO",     label:"Full-face photographic images",            token:"[PHOTO-REF]"},
+  {n:18, id:"OTHERID",   label:"Any other unique identifying number, characteristic or code", token:"[ID]"}
+];
+var CAT_BY_ID = {};
+CATS.forEach(function(c){ CAT_BY_ID[c.id] = c; });
+
+/* =====================================================================
+   5. DETECTORS
+   ===================================================================== */
+function scan(text, re, cb){
+  re.lastIndex = 0;
+  var m;
+  while ((m = re.exec(text)) !== null){
+    if (m[0].length === 0){ re.lastIndex++; continue; }
+    cb(m);
+  }
+}
+function noDigitEdge(text, s, e){
+  if (s > 0 && /\d/.test(text.charAt(s-1))) return false;
+  if (e < text.length && /\d/.test(text.charAt(e))) return false;
+  return true;
+}
+function mk(text, s, e, cat, o){
+  o = o || {};
+  return {
+    start: s, end: e, text: text.slice(s, e),
+    cat: cat, sub: o.sub || cat, conf: o.conf || "medium",
+    rule: o.rule || "unnamed", note: o.note || "",
+    prio: o.prio || 50, meta: o.meta || null
+  };
+}
+/* prefix-anchored context detector: group 1 is the trigger + separator,
+   group 2 is the value. Only the value is redacted. */
+function ctx(text, out, re, cat, o){
+  scan(text, re, function(m){
+    if (!m[2]) return;
+    var s = m.index + m[1].length;
+    out.push(mk(text, s, s + m[2].length, cat, o));
+  });
+}
+
+var MONTHS = {jan:1,january:1,feb:2,february:2,mar:3,march:3,apr:4,april:4,may:5,jun:6,june:6,
+  jul:7,july:7,aug:8,august:8,sep:9,sept:9,september:9,oct:10,october:10,nov:11,november:11,dec:12,december:12};
+var MONTH_ALT = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec";
+
+function yr4(y){
+  var n = parseInt(y, 10);
+  if (y.length === 4) return n;
+  return (n <= (REF_YEAR % 100)) ? 2000 + n : 1900 + n;
+}
+function ageAt(y, m, d){
+  var a = REF_YEAR - y;
+  if (m > REF_MONTH || (m === REF_MONTH && d > REF_DAY)) a--;
+  return a;
+}
+function isBirthCtx(text, s){
+  var pre = text.slice(Math.max(0, s - 34), s);
+  return /(?:d\.?o\.?b\.?|date\s+of\s+birth|birth\s*date|born(?:\s+on)?)\s*[:=]?\s*$/i.test(pre);
+}
+
+function detect(text){
+  var out = [];
+  var i;
+
+  /* ---- 7 SSN -------------------------------------------------------- */
+  scan(text, /\b(\d{3})[-\s](\d{2})[-\s](\d{4})\b/g, function(m){
+    if (!noDigitEdge(text, m.index, m.index + m[0].length)) return;
+    var ok = ssnValid(m[1], m[2], m[3]);
+    out.push(mk(text, m.index, m.index + m[0].length, "SSN", {
+      prio: 95, conf: ok ? "high" : "low",
+      rule: ok ? "ssn-delimited+ssa-issuance-rules" : "ssn-shape-only (fails SSA issuance rules)",
+      note: ok ? "" : "Area, group or serial is in a never-issued range; redacted anyway, conservatively."
+    }));
+  });
+  ctx(text, out, /((?:\bSSN|\bsocial\s+security(?:\s+(?:number|no\.?|#))?)\s*[:#=]?\s*)(?=[\d-]*\d)(\d{3}-?\d{2}-?\d{4})/gi,
+      "SSN", {prio: 96, conf: "high", rule: "context-ssn-label"});
+
+  /* ---- 6 EMAIL ------------------------------------------------------ */
+  scan(text, /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}\b/g, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "EMAIL", {prio: 92, conf: "high", rule: "rfc-shaped-mailbox"}));
+  });
+
+  /* ---- 14 URL ------------------------------------------------------- */
+  scan(text, /\b(?:https?:\/\/|www\.)[^\s<>"'\)\]]+/gi, function(m){
+    var t = m[0].replace(/[.,;:]+$/, "");
+    out.push(mk(text, m.index, m.index + t.length, "URL", {prio: 91, conf: "high", rule: "scheme-or-www-prefix"}));
+  });
+
+  /* ---- 15 IP -------------------------------------------------------- */
+  scan(text, /\b(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\b/g, function(m){
+    var priv = /^(?:10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|127\.)/.test(m[0]);
+    out.push(mk(text, m.index, m.index + m[0].length, "IP", {
+      prio: 90, sub: "IPV4", conf: "high", rule: "ipv4-octet-range-validated",
+      note: priv ? "RFC 1918 private address — still an identifier in a log excerpt; redacted." : ""
+    }));
+  });
+  scan(text, /\b[0-9A-Fa-f:]{2,45}\b/g, function(m){
+    if (m[0].indexOf(":") < 0) return;
+    if (!isIPv6(m[0])) return;
+    out.push(mk(text, m.index, m.index + m[0].length, "IP", {prio: 90, sub: "IPV6", conf: "high", rule: "ipv6-group-structure-validated"}));
+  });
+
+  /* ---- 9 HEALTH PLAN: validated CMS MBI ----------------------------- */
+  scan(text, /\b[0-9A-Za-z]{4}-?[0-9A-Za-z]{3}-?[0-9A-Za-z]{4}\b/g, function(m){
+    if (!isMBI(m[0])) return;
+    out.push(mk(text, m.index, m.index + m[0].length, "PLAN", {
+      prio: 94, conf: "high", rule: "cms-mbi-positional-format",
+      note: "Matches the CMS Medicare Beneficiary Identifier layout, including the S/L/O/I/B/Z letter exclusions."
+    }));
+  });
+  ctx(text, out, /((?:\bmember(?:\s+(?:ID|no\.?|number|#))?|\bsubscriber(?:\s+(?:ID|no\.?|number|#))?|\bpolicy(?:\s+(?:no\.?|number|#|ID))?|\bbeneficiary(?:\s+(?:no\.?|number|#))?|\binsurance(?:\s+(?:ID|no\.?|number|#))?|\bgroup(?:\s+(?:no\.?|number|#))?|\bMedicare(?:\s+(?:number|no\.?|#|ID))?|\bMedicaid(?:\s+(?:number|no\.?|#|ID))?|\bMBI)\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9-]*\d)([A-Za-z0-9][A-Za-z0-9-]{2,23})/gi,
+      "PLAN", {prio: 90, conf: "high", rule: "context-payer-label"});
+
+  /* ---- 8 MRN -------------------------------------------------------- */
+  ctx(text, out, /((?:\bMRN|\bMR\s*#|\bmedical\s+record(?:\s+(?:number|no\.?|#))?|\brecord\s+no\.?|\bchart\s+(?:number|no\.?|#))\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9\/-]*\d)([A-Za-z0-9][A-Za-z0-9\/-]{2,23})/gi,
+      "MRN", {prio: 90, conf: "high", rule: "context-mrn-label"});
+
+  /* ---- 11 CERTIFICATE / LICENCE ------------------------------------- */
+  scan(text, /\b[A-Za-z]{2}\d{7}\b/g, function(m){
+    if (!isDEA(m[0])) return;
+    out.push(mk(text, m.index, m.index + m[0].length, "LICENSE", {
+      prio: 89, conf: "high", rule: "dea-registrant-checksum",
+      note: "DEA numbers identify a prescriber, not the patient. Safe Harbor covers identifiers of the individual and of relatives, employers and household members — a provider registration is redacted here conservatively, not because §164.514(b)(2) compels it."
+    }));
+  });
+  scan(text, /\b\d{10}\b/g, function(m){
+    if (!noDigitEdge(text, m.index, m.index + 10)) return;
+    if (!isNPI(m[0])) return;
+    var pre = text.slice(Math.max(0, m.index - 12), m.index);
+    var labelled = /npi\s*[:#=]?\s*$/i.test(pre);
+    out.push(mk(text, m.index, m.index + 10, "LICENSE", {
+      prio: 89, conf: labelled ? "high" : "medium",
+      rule: labelled ? "context-npi-label+luhn(80840)" : "npi-luhn(80840)-unlabelled",
+      note: "Provider identifier. Redacted conservatively; Safe Harbor targets identifiers of the individual and of relatives, employers and household members."
+    }));
+  });
+  ctx(text, out, /((?:\blicen[cs]e|\blic\.?|\bcertificate|\bcert\.?|\bregistration|\bDEA|\bNPI)\s*(?:no\.?|number|#|ID)?\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9\/-]*\d)([A-Za-z0-9][A-Za-z0-9\/-]{3,23})/gi,
+      "LICENSE", {prio: 86, conf: "medium", rule: "context-licence-label"});
+
+  /* ---- 12 VEHICLE --------------------------------------------------- */
+  scan(text, /\b[A-HJ-NPR-Z0-9]{17}\b/g, function(m){
+    var ok = isVIN(m[0]);
+    if (!ok && !/\d/.test(m[0])) return;
+    out.push(mk(text, m.index, m.index + 17, "VEHICLE", {
+      prio: 90, conf: ok ? "high" : "low",
+      rule: ok ? "vin-iso3779-check-digit" : "vin-shape-only (check digit fails)",
+      note: ok ? "" : "17-character VIN alphabet but the position-9 check digit does not verify."
+    }));
+  });
+  ctx(text, out, /((?:\blicen[cs]e\s+plate|\bplate|\btag|\bregistration\s+plate)\s*(?:no\.?|number|#)?\s*[:#=]?\s*)(?=[A-Za-z0-9-]*\d)([A-Z0-9]{2,4}[- ]?[A-Z0-9]{2,5})/g,
+      "VEHICLE", {prio: 89, conf: "medium", rule: "context-plate-label"});
+
+  /* ---- 13 DEVICE ---------------------------------------------------- */
+  ctx(text, out, /((?:\bdevice(?:\s+(?:ID|identifier|serial))?|\bserial|\bS\/N|\bUDI(?:-DI)?|\blot|\bimplant(?:\s+(?:serial|ID))?|\bcatheter|\bpacemaker|\bpump|\bstent)\s*(?:no\.?|number|#|ID)?\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9\/-]*\d)([A-Za-z0-9][A-Za-z0-9\/-]{3,23})/gi,
+      "DEVICE", {prio: 84, conf: "medium", rule: "context-device-label"});
+  scan(text, /\(01\)\d{14}(?:\(17\)\d{6})?(?:\(10\)[A-Za-z0-9]+)?/g, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "DEVICE", {prio: 88, conf: "high", rule: "gs1-udi-application-identifiers"}));
+  });
+
+  /* ---- 10 ACCOUNT --------------------------------------------------- */
+  ctx(text, out, /((?:\bbilling\s+account|\baccount|\bacct\.?|\binvoice|\bstatement)\s*(?:no\.?|number|#|ID)?\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9-]*\d)([A-Za-z0-9][A-Za-z0-9-]{3,23})/gi,
+      "ACCOUNT", {prio: 86, conf: "high", rule: "context-account-label"});
+
+  /* ---- 4 PHONE / 5 FAX ---------------------------------------------- */
+  scan(text, /(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}/g, function(m){
+    var s = m.index, e = m.index + m[0].length;
+    if (!noDigitEdge(text, s, e)) return;
+    var pre = text.slice(Math.max(0, s - 26), s);
+    var isFax = /\bfax\b[^A-Za-z0-9]{0,12}$|\bfaxed\s+to\s*$/i.test(pre);
+    out.push(mk(text, s, e, isFax ? "FAX" : "PHONE", {
+      prio: 85, conf: "high",
+      rule: isFax ? "nanp-shape+fax-context" : "nanp-shape (north american numbering plan)"
+    }));
+  });
+
+  /* ---- 3 DATES ------------------------------------------------------ */
+  function pushDate(s, e, y, mo, d, ruleName, swapped){
+    if (mo !== null && (mo < 1 || mo > 12)) return;
+    if (d !== null && (d < 1 || d > 31)) return;
+    var birth = isBirthCtx(text, s);
+    var age = (y !== null) ? ageAt(y, mo === null ? 1 : mo, d === null ? 1 : d) : null;
+    out.push(mk(text, s, e, "DATE", {
+      prio: 80, sub: "DATE", conf: "high", rule: ruleName,
+      note: swapped ? "First field exceeds 12 — read as DD/MM rather than MM/DD." : "",
+      meta: {year: y, month: mo, day: d, birth: birth, age: age}
+    }));
+  }
+  scan(text, /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/g, function(m){
+    pushDate(m.index, m.index + m[0].length, parseInt(m[1],10), parseInt(m[2],10), parseInt(m[3],10), "date-iso-8601", false);
+  });
+  scan(text, /\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/g, function(m){
+    var a = parseInt(m[1],10), b = parseInt(m[2],10), swapped = false, mo = a, d = b;
+    if (a > 12 && b <= 12){ mo = b; d = a; swapped = true; }
+    pushDate(m.index, m.index + m[0].length, yr4(m[3]), mo, d, "date-numeric-slash-or-dash", swapped);
+  });
+  scan(text, new RegExp("\\b(" + MONTH_ALT + ")[a-z]*\\.?\\s+(\\d{4})\\b", "gi"), function(m){
+    pushDate(m.index, m.index + m[0].length, parseInt(m[2],10), MONTHS[m[1].toLowerCase()], null, "date-month-year", false);
+  });
+  scan(text, new RegExp("\\b(" + MONTH_ALT + ")[a-z]*\\.?\\s+(?!\\d{4}\\b)(\\d{1,2})(?:st|nd|rd|th)?,?\\s*(\\d{2,4})?\\b", "gi"), function(m){
+    var y = m[3] ? yr4(m[3]) : null;
+    pushDate(m.index, m.index + m[0].length, y, MONTHS[m[1].toLowerCase()], parseInt(m[2],10), "date-month-name-first", false);
+  });
+  scan(text, new RegExp("\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(" + MONTH_ALT + ")[a-z]*\\.?,?\\s*(\\d{2,4})?\\b", "gi"), function(m){
+    var y = m[3] ? yr4(m[3]) : null;
+    pushDate(m.index, m.index + m[0].length, y, MONTHS[m[2].toLowerCase()], parseInt(m[1],10), "date-day-first", false);
+  });
+  scan(text, /\b(\d{1,2})\/(\d{4})\b/g, function(m){
+    pushDate(m.index, m.index + m[0].length, parseInt(m[2],10), parseInt(m[1],10), null, "date-numeric-month-year", false);
+  });
+
+  /* ---- 3 AGES ------------------------------------------------------- */
+  function pushAge(s, e, n, ruleName){
+    if (isNaN(n) || n < 0 || n > 130) return;
+    out.push(mk(text, s, e, "DATE", {
+      prio: 82, sub: "AGE", conf: "high", rule: ruleName, meta: {age: n}
+    }));
+  }
+  scan(text, /\b(\d{1,3})[\s-]*(?:year|yr)s?[\s-]*old\b/gi, function(m){
+    pushAge(m.index, m.index + m[0].length, parseInt(m[1],10), "age-years-old");
+  });
+  scan(text, /\bages?d?\s+(\d{1,3})\b/gi, function(m){
+    pushAge(m.index, m.index + m[0].length, parseInt(m[1],10), "age-aged-label");
+  });
+  scan(text, /\b(\d{1,3})\s*(?:y\/o|y\.o\.|yo)\b/g, function(m){
+    pushAge(m.index, m.index + m[0].length, parseInt(m[1],10), "age-yo-abbreviation");
+  });
+
+  /* ---- 2 GEOGRAPHY -------------------------------------------------- */
+  var SUFFIX = "Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Terrace|Ter|Circle|Cir|Highway|Hwy|Parkway|Pkwy|Trail|Trl|Square|Sq";
+  scan(text, new RegExp("\\b\\d{1,6}\\s+(?:" + STREETWORD + "\\s+){0,3}(?:" + SUFFIX + ")\\b\\.?(?:,?\\s*(?:Apt|Apartment|Suite|Ste|Unit|Rm|Room|Fl|Floor|#)\\.?\\s*[A-Za-z0-9-]+)?", "g"), function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "GEO", {
+      prio: 78, sub: "STREET", conf: "high", rule: "street-address-number+suffix"
+    }));
+  });
+  /* Without a house number to anchor it, "Dr" and "St" are far more often
+     Doctor and Saint than Drive and Street, so they are dropped from this
+     rule; a leading-word stoplist catches the rest ("Dear Dr.", "Yours Ave"). */
+  var SUFFIX_UNNUMBERED = "Street|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Lane|Ln|Court|Ct|Place|Terrace|Ter|Circle|Cir|Highway|Hwy|Parkway|Pkwy|Trail|Trl|Square";
+  var ROAD_STOP = /^(?:Dear|Sincerely|Yours|Attn|Signed|Referring|Attending|Regarding|Thank|Best|Kind|The|This|That|Her|His|Their|Our|Your|RE)\b/;
+  scan(text, new RegExp("\\b" + STREETWORD + "(?:\\s+" + STREETWORD + ")?\\s+(?:" + SUFFIX_UNNUMBERED + ")\\b", "g"), function(m){
+    if (ROAD_STOP.test(m[0])) return;
+    out.push(mk(text, m.index, m.index + m[0].length, "GEO", {
+      prio: 74, sub: "STREET", conf: "medium", rule: "named-road-without-house-number"
+    }));
+  });
+  scan(text, RE_CITIES, function(m){
+    var post = text.slice(m.index + m[0].length, m.index + m[0].length + 12);
+    var strong = /^\s*,\s*[A-Z]{2}\b/.test(post) || /^\s+\d{5}\b/.test(post);
+    out.push(mk(text, m.index, m.index + m[0].length, "GEO", {
+      prio: 70, sub: "CITY", conf: strong ? "high" : "medium",
+      rule: strong ? "city-gazetteer+state-or-zip-adjacent" : "city-gazetteer"
+    }));
+  });
+  scan(text, /\b([A-Z][a-z]+)\s+County\b/g, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "GEO", {prio: 72, sub: "COUNTY", conf: "high", rule: "county-suffix"}));
+  });
+  /* A bare ", XX" is far too loose — "Raghunathan, DDS, MD" is not Maryland.
+     A two-letter state code is only accepted when a ZIP follows it, or when a
+     gazetteer city immediately precedes it. */
+  scan(text, new RegExp(",\\s*(" + STATE_ABBR.join("|") + ")\\b(?=\\s+\\d{5}\\b)", "g"), function(m){
+    var s = m.index + m[0].length - 2;
+    out.push(mk(text, s, s + 2, "GEO", {prio: 60, sub: "STATE", conf: "high", rule: "state-abbreviation-before-zip"}));
+  });
+  scan(text, new RegExp("\\b(?:" + CITY_ALT + "),\\s*(" + STATE_ABBR.join("|") + ")\\b", "g"), function(m){
+    var s = m.index + m[0].length - 2;
+    out.push(mk(text, s, s + 2, "GEO", {prio: 59, sub: "STATE", conf: "medium", rule: "state-abbreviation-after-gazetteer-city"}));
+  });
+  scan(text, RE_STATEF, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "GEO", {prio: 58, sub: "STATE", conf: "medium", rule: "state-name-gazetteer"}));
+  });
+  scan(text, /\b(\d{5})(-\d{4})?\b/g, function(m){
+    var s = m.index, e = m.index + m[0].length;
+    if (!noDigitEdge(text, s, e)) return;
+    var pre = text.slice(Math.max(0, s - 14), s);
+    var strong = /(?:\b[A-Z]{2}\s*|zip(?:\s*code)?\s*[:#=]?\s*|postal\s*(?:code)?\s*[:#=]?\s*)$/i.test(pre);
+    if (!strong) return;
+    out.push(mk(text, s, e, "GEO", {
+      prio: 76, sub: "ZIP", conf: "high",
+      rule: m[2] ? "zip+4-with-state-or-label-context" : "zip5-with-state-or-label-context",
+      meta: {zip5: m[1]}
+    }));
+  });
+
+  /* ---- 16 BIOMETRIC ------------------------------------------------- */
+  scan(text, /\b(?:finger\s?print(?:s|ing)?|thumb\s?print|palm\s?print|retinal?\s+scan|iris\s+scan|voice\s?print|voice\s+recognition|facial\s+recognition|gait\s+analysis|biometrics?|DNA\s+(?:profile|sequence|fingerprint))\b/gi, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "BIOMETRIC", {prio: 74, conf: "high", rule: "biometric-modality-lexicon"}));
+  });
+
+  /* ---- 17 FULL-FACE PHOTOGRAPHS ------------------------------------- */
+  scan(text, /\b(?:full[\s-]face(?:\s+(?:clinical\s+)?(?:photograph|photo|image))?|facial\s+(?:photograph|photo|image)|frontal\s+facial\s+image|head\s?shot|clinical\s+photograph|photo(?:graph)?\s+ID|photograph\s+of\s+the\s+(?:patient|face))\b/gi, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "PHOTO", {
+      prio: 74, conf: "medium", rule: "full-face-image-lexicon",
+      note: "Only full-face and comparable images are enumerated. Intraoral, radiographic and anatomical images are not, though they can still be identifying."
+    }));
+  });
+
+  /* ---- 18 OTHER UNIQUE IDENTIFIERS ---------------------------------- */
+  ctx(text, out, /((?:\bstudy(?:\s+(?:ID|no\.?|number))?|\baccession(?:\s+(?:no\.?|number|#))?|\bspecimen(?:\s+(?:ID|no\.?|number))?|\bencounter(?:\s+(?:ID|no\.?|number))?|\bvisit(?:\s+(?:no\.?|number|ID))?|\bcase(?:\s+(?:no\.?|number|ID))?|\bsubject(?:\s+ID)?|\bpatient\s+ID|\bbarcode|\bconfirmation(?:\s+(?:no\.?|number|code))?)\s*(?:is\s+)?[:#=]?\s*)(?=[A-Za-z0-9\/-]*\d)([A-Za-z0-9][A-Za-z0-9\/-]{3,23})/gi,
+      "OTHERID", {prio: 68, conf: "medium", rule: "context-identifier-label"});
+  scan(text, /\b[A-Z0-9]{2,}(?:-[A-Z0-9]+){1,4}\b/g, function(m){
+    if (m[0].length < 6) return;
+    if (!/[A-Z]/.test(m[0]) || !/\d/.test(m[0])) return;
+    out.push(mk(text, m.index, m.index + m[0].length, "OTHERID", {
+      prio: 40, conf: "low", rule: "generic-alphanumeric-code-net",
+      note: "Shape-only match. Category 18 is a catch-all; a person must decide whether this code is identifying."
+    }));
+  });
+  scan(text, /\b(?:the only|one of only|the sole|only (?:patient|case|person|individual|resident)|world'?s only|first (?:patient|case) in)\b[^.\n]{0,120}/gi, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "OTHERID", {
+      prio: 36, sub: "CHARACTERISTIC", conf: "low", rule: "unique-characteristic-cue",
+      note: "Category 18 covers unique characteristics, not only numbers. No regular expression can enumerate these; this cue list is a prompt for a reviewer, not a detector."
+    }));
+  });
+
+  /* ---- 1 NAMES ------------------------------------------------------ */
+  /* All three name-context rules are CASE-SENSITIVE by design: the trigger
+     alternatives spell out both cases, so the captured token must genuinely
+     begin with a capital. Running these with the /i flag makes [A-Z][a-z]+
+     match any word and turns "patient in the county" into a name. */
+  var TITLE = "Mr\\.|Mrs\\.|Ms\\.|Miss|Dr\\.|Doctor|Prof\\.|Sr\\.|Sra\\.";
+  var VERB  = "[Pp]atient(?:\\s+is|\\s+named)?|[Pp]t\\.|[Ss]een\\s+by|[Ss]igned(?:\\s+by)?|" +
+              "[Rr]eferred\\s+(?:to|by)|[Rr]eferring|[Aa]ttending|[Aa]dmitted\\s+by|" +
+              "[Dd]ischarged\\s+by|[Pp]erformed\\s+by|[Dd]ictated\\s+by|Attn\\.?:|RE:|Dear|Sincerely,";
+  var REL   = "[Mm]other|[Ff]ather|[Ss]on|[Dd]aughter|[Ww]ife|[Hh]usband|[Ss]pouse|[Bb]rother|" +
+              "[Ss]ister|[Gg]uardian|[Nn]ext\\s+of\\s+kin|[Ee]mergency\\s+contact|[Pp]arent|" +
+              "[Cc]aregiver|[Pp]artner";
+
+  scan(text, new RegExp("\\b(?:" + TITLE + ")\\s+(" + FULLNAME + ")", "g"), function(m){
+    var s = m.index + m[0].indexOf(m[1], 2);
+    var isDoc = /^(?:Dr\.|Doctor|Prof\.)/.test(m[0]);
+    out.push(mk(text, s, s + m[1].length, "NAME", {
+      prio: 73, conf: "high", rule: "context-title (" + m[0].slice(0, m[0].indexOf(m[1])).trim() + ")",
+      note: isDoc ? "Reads as a clinician. Safe Harbor removes identifiers of the individual and of relatives, employers and household members; provider names are redacted here conservatively." : ""
+    }));
+  });
+  /* The trigger may be followed by an honorific ("RE: Ms. Harriet Osei").
+     Step over it so the honorific is not itself captured as the name. */
+  scan(text, new RegExp("\\b(?:" + VERB + ")\\s*:?\\s+(?:(?:" + TITLE + ")\\s*)?(" + FULLNAME + ")", "g"), function(m){
+    if (/^(?:Mr|Mrs|Ms|Dr|Miss|Prof|Sr|Sra)$/.test(m[1])) return;
+    var s = m.index + m[0].lastIndexOf(m[1]);
+    out.push(mk(text, s, s + m[1].length, "NAME", {prio: 72, conf: "high", rule: "context-verb-or-salutation"}));
+  });
+  scan(text, new RegExp("\\b(?:" + REL + ")\\s*,?\\s+((?:Mr\\.|Mrs\\.|Ms\\.)\\s+)?(" + FULLNAME + ")", "g"), function(m){
+    var s = m.index + m[0].lastIndexOf(m[2]);
+    out.push(mk(text, s, s + m[2].length, "NAME", {
+      prio: 72, conf: "high", rule: "context-relation",
+      note: "Relatives are explicitly in scope: §164.514(b)(2)(i) covers identifiers of the individual and of relatives, employers and household members."
+    }));
+  });
+  /* surname-first with a comma, e.g. "Delgado, Marcus" */
+  scan(text, RE_NAMES, function(m){
+    out.push(mk(text, m.index, m.index + m[0].length, "NAME", {
+      prio: 55, conf: "medium", rule: "name-gazetteer"
+    }));
+  });
+
+  /* merge adjacent gazetteer name tokens ("Alan" + "Whitfield") */
+  var gaz = out.filter(function(d){ return d.rule === "name-gazetteer"; })
+               .sort(function(a,b){ return a.start - b.start; });
+  var merged = [], cur = null;
+  for (i=0;i<gaz.length;i++){
+    if (cur && /^[ ]{1,2}$/.test(text.slice(cur.end, gaz[i].start))){
+      cur.end = gaz[i].end; cur.text = text.slice(cur.start, cur.end);
+      cur.rule = "name-gazetteer (adjacent tokens merged)";
+    } else {
+      cur = gaz[i]; merged.push(cur);
+    }
+  }
+  out = out.filter(function(d){ return d.rule.indexOf("name-gazetteer") !== 0; }).concat(merged);
+
+  return out;
+}
+
+/* =====================================================================
+   6. SPAN RESOLUTION — specificity first, then length
+   ===================================================================== */
+function resolve(raw){
+  var cands = raw.slice().sort(function(a,b){
+    if (b.prio !== a.prio) return b.prio - a.prio;
+    var la = a.end - a.start, lb = b.end - b.start;
+    if (lb !== la) return lb - la;
+    return a.start - b.start;
+  });
+  var kept = [], suppressed = [];
+  for (var i=0;i<cands.length;i++){
+    var c = cands[i], clash = false;
+    for (var j=0;j<kept.length;j++){
+      if (c.start < kept[j].end && kept[j].start < c.end){ clash = true; break; }
+    }
+    if (clash) suppressed.push(c); else kept.push(c);
+  }
+  kept.sort(function(a,b){ return a.start - b.start; });
+  return {kept: kept, suppressed: suppressed};
+}
+
+/* =====================================================================
+   7. TRANSFORMATION — Safe Harbor vs Limited Data Set
+   ===================================================================== */
+function planOne(d, mode){
+  var cat = CAT_BY_ID[d.cat];
+  var keep = function(why){ return {redact:false, rep:d.text, why:why}; };
+  var cut  = function(rep, why){ return {redact:true, rep:rep, why:why}; };
+
+  if (d.cat === "GEO"){
+    if (d.sub === "STREET") return cut("[ADDRESS]", mode === "lds"
+      ? "Street address is excluded from a Limited Data Set; town, state and ZIP are not."
+      : "Geographic subdivision smaller than a state.");
+    if (mode === "lds") return keep("Retained: §164.514(e)(2)(ii) excludes postal address other than town or city, state and ZIP code.");
+    if (d.sub === "STATE") return keep("Retained: a state is not a subdivision smaller than a state.");
+    if (d.sub === "CITY")  return cut("[CITY]", "City is a subdivision smaller than a state.");
+    if (d.sub === "COUNTY") return cut("[COUNTY]", "County is a subdivision smaller than a state.");
+    if (d.sub === "ZIP"){
+      var z5 = (d.meta && d.meta.zip5) || d.text.replace(/\D/g, "").slice(0,5);
+      var p3 = z5.slice(0,3);
+      if (RESTRICTED_ZIP3.indexOf(p3) >= 0)
+        return cut("[ZIP:000]", "Prefix " + p3 + " is on the restricted list — its 3-digit area holds 20,000 people or fewer, so §164.514(b)(2)(i)(B) requires it be changed to 000.");
+      return cut("[ZIP:" + p3 + "**]", "First three digits retained under §164.514(b)(2)(i)(B); prefix " + p3 + " is not on the restricted list. Remaining digits and any +4 removed.");
+    }
+    return cut("[GEO]", "Geographic subdivision.");
+  }
+
+  if (d.cat === "DATE"){
+    if (d.sub === "AGE"){
+      var a = d.meta ? d.meta.age : null;
+      if (a !== null && a > 89){
+        if (mode === "lds") return keep("Retained: a Limited Data Set may carry ages over 89; the 90+ aggregation rule belongs to Safe Harbor.");
+        return cut("90+", "Age " + a + " exceeds 89 — aggregated to a single 90-or-older category per §164.514(b)(2)(i)(C).");
+      }
+      return keep("Retained: Safe Harbor removes only ages over 89. This age survives and is counted as a quasi-identifier below.");
+    }
+    if (mode === "lds") return keep("Retained: dates are not among the 16 direct identifiers listed at §164.514(e)(2).");
+    var y = d.meta ? d.meta.year : null;
+    if (y === null) return cut("[DATE]", "Date elements smaller than a year, with no year present.");
+    var impliedAge = d.meta.birth ? ageAt(y, d.meta.month || 1, d.meta.day || 1) : null;
+    if (impliedAge !== null && impliedAge > 89)
+      return cut("[DATE]", "Year suppressed as well: a birth year of " + y + " is an element of a date indicative of an age over 89.");
+    return cut("[DATE:" + y + "]", "Month and day removed; the year is retainable under §164.514(b)(2)(i)(C) and is counted as a quasi-identifier below.");
+  }
+
+  if (mode === "lds" && d.cat === "OTHERID")
+    return keep("Retained: §164.514(e)(2) enumerates 16 direct identifiers and does not include 'any other unique identifying number, characteristic or code'. Flagged for human review rather than removed.");
+
+  return cut(cat.token, "Category " + cat.n + " — " + cat.label + ".");
+}
+
+/* =====================================================================
+   8. RISK MODEL
+   ===================================================================== */
+function riskModel(kept, plans, mode, text){
+  var qis = [], i, d, p;
+
+  /* geography */
+  var geoKey = "US", geoVal = "none released";
+  var sawZip = null, sawZipRestricted = false, sawCity = null, sawCounty = null, sawState = null;
+  for (i=0;i<kept.length;i++){
+    d = kept[i]; p = plans[i];
+    if (d.cat !== "GEO") continue;
+    if (d.sub === "ZIP"){
+      var z5 = (d.meta && d.meta.zip5) || d.text.replace(/\D/g, "").slice(0,5);
+      if (mode === "lds") sawZip = {kind:"ZIP5", val:z5};
+      else if (RESTRICTED_ZIP3.indexOf(z5.slice(0,3)) >= 0) sawZipRestricted = true;
+      else sawZip = {kind:"ZIP3", val:z5.slice(0,3)};
+    }
+    if (d.sub === "CITY" && !p.redact) sawCity = d.text;
+    if (d.sub === "COUNTY" && !p.redact) sawCounty = d.text;
+    if (d.sub === "STATE" && !p.redact) sawState = d.text;
+  }
+  if (sawZip && sawZip.kind === "ZIP5"){ geoKey = "ZIP5"; geoVal = "5-digit ZIP " + sawZip.val; }
+  else if (sawZip && sawZip.kind === "ZIP3"){ geoKey = "ZIP3"; geoVal = "3-digit ZIP prefix " + sawZip.val; }
+  else if (sawCity){ geoKey = "CITY"; geoVal = "city " + sawCity; }
+  else if (sawCounty){ geoKey = "COUNTY"; geoVal = sawCounty; }
+  else if (sawState){ geoKey = "STATE"; geoVal = "state " + sawState; }
+
+  /* sex */
+  var sexCue = /\b(?:male|female|man|woman|boy|girl|gentleman|lady|he|she|his|her|him|hers|Mr\.|Mrs\.|Ms\.)\b/i.test(text);
+  if (sexCue) qis.push({name:"Sex", value:"stated or implied by pronoun", p:P_SEX, basis:"two near-equal categories; sex is not an enumerated identifier and always survives"});
+
+  /* birth granularity — take the single most granular surviving signal */
+  var birth = null;
+  for (i=0;i<kept.length;i++){
+    d = kept[i]; p = plans[i];
+    if (d.cat !== "DATE") continue;
+    if (d.sub === "AGE"){
+      var a = d.meta ? d.meta.age : null;
+      if (a === null) continue;
+      if (!p.redact && a <= 89) birth = birth && birth.rank >= 2 ? birth : {rank:2, name:"Age", value:"exact age " + a, p:P_AGE_EXACT, basis:"one of ~90 single-year age cohorts"};
+      else if (a > 89 && !p.redact) birth = birth && birth.rank >= 2 ? birth : {rank:2, name:"Age", value:"exact age " + a, p:P_AGE_EXACT, basis:"one of ~90 single-year age cohorts"};
+      else if (a > 89) birth = birth || {rank:1, name:"Age band", value:"90 or older", p:P_AGE_90P, basis:"approx. 0.7% of the US population is aged 90 or over — a small bucket is more identifying, not less"};
+    }
+    if (d.sub === "DATE" && d.meta && d.meta.birth){
+      if (!p.redact && d.meta.year !== null){
+        birth = {rank:3, name:"Date of birth", value:"full date " + d.text, p:P_FULL_DOB, basis:"~32,850 distinct birth dates across a 90-year span"};
+      } else if (p.redact && p.rep.indexOf("[DATE:") === 0){
+        if (!birth || birth.rank < 2) birth = {rank:2, name:"Year of birth", value:"year " + d.meta.year, p:P_BIRTHYR, basis:"one of ~90 single-year birth cohorts"};
+      }
+    }
+  }
+  if (birth) qis.push({name:birth.name, value:birth.value, p:birth.p, basis:birth.basis});
+
+  /* service-date linkage — an aggravating factor, not a population factor */
+  var serviceFull = false, serviceYear = null;
+  for (i=0;i<kept.length;i++){
+    d = kept[i]; p = plans[i];
+    if (d.cat !== "DATE" || d.sub !== "DATE") continue;
+    if (d.meta && d.meta.birth) continue;
+    if (!p.redact) serviceFull = true;
+    else if (p.rep.indexOf("[DATE:") === 0 && serviceYear === null) serviceYear = d.meta.year;
+  }
+
+  var N = POP[geoKey].n;
+  var k = N;
+  for (i=0;i<qis.length;i++) k *= qis[i].p;
+
+  var band, chip;
+  if (k < 5){ band = "HIGH"; chip = "bad"; }
+  else if (k < 11){ band = "MODERATE"; chip = "warn"; }
+  else { band = "LOW"; chip = "ok"; }
+
+  var downgraded = false;
+  if (serviceFull && band === "LOW"){ band = "MODERATE"; chip = "warn"; downgraded = true; }
+  else if (serviceFull && band === "MODERATE"){ band = "HIGH"; chip = "bad"; downgraded = true; }
+
+  return {
+    qis: qis, k: k, band: band, chip: chip, geoKey: geoKey, geoVal: geoVal, N: N,
+    geoBasis: POP[geoKey].basis, sexCue: sexCue,
+    serviceFull: serviceFull, serviceYear: serviceYear, downgraded: downgraded,
+    zipRestricted: sawZipRestricted
+  };
+}
+
+/* =====================================================================
+   9. RENDER
+   ===================================================================== */
+function escHtml(s){
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function fmtK(k){
+  if (!isFinite(k)) return "—";
+  if (k < 0.01) return "<0.01";
+  if (k < 1)  return k.toFixed(2);
+  if (k < 10) return k.toFixed(1);
+  return Math.round(k).toLocaleString("en-US");
+}
+function fmtP(p){
+  if (p >= 0.1) return p.toFixed(2);
+  var inv = Math.round(1 / p);
+  return "1 / " + inv.toLocaleString("en-US");
+}
+
+var $ = function(id){ return document.getElementById(id); };
+var state = {mode: "sh", text: ""};
+
+function analyse(){
+  var text = $("src").value;
+  var mode = state.mode;
+
+  var raw = detect(text);
+  var res = resolve(raw);
+  var kept = res.kept;
+  var plans = kept.map(function(d){ return planOne(d, mode); });
+
+  /* ---- panes ---- */
+  var oHtml = "", dHtml = "", cursor = 0, charsRedacted = 0;
+  for (var i=0;i<kept.length;i++){
+    var d = kept[i], p = plans[i];
+    oHtml += escHtml(text.slice(cursor, d.start));
+    dHtml += escHtml(text.slice(cursor, d.start));
+    oHtml += '<mark class="hit">' + escHtml(d.text) + "</mark>";
+    if (p.redact){
+      dHtml += '<mark class="tok">' + escHtml(p.rep) + "</mark>";
+      charsRedacted += (d.end - d.start);
+    } else {
+      dHtml += '<mark class="keep">' + escHtml(d.text) + "</mark>";
+    }
+    cursor = d.end;
+  }
+  oHtml += escHtml(text.slice(cursor));
+  dHtml += escHtml(text.slice(cursor));
+  $("pane-orig").innerHTML = oHtml || '<span class="mono">No input.</span>';
+  $("pane-deid").innerHTML = dHtml || '<span class="mono">No input.</span>';
+  $("pane-deid-h").textContent = "De-identified output — " + (mode === "sh" ? "Safe Harbor §164.514(b)(2)" : "Limited Data Set §164.514(e)");
+
+  /* plain-text output for the clipboard */
+  var plain = "", c2 = 0;
+  for (i=0;i<kept.length;i++){
+    plain += text.slice(c2, kept[i].start) + (plans[i].redact ? plans[i].rep : kept[i].text);
+    c2 = kept[i].end;
+  }
+  plain += text.slice(c2);
+  state.deid = plain;
+
+  /* ---- counters ---- */
+  var catsHit = {};
+  kept.forEach(function(d){ catsHit[d.cat] = (catsHit[d.cat] || 0) + 1; });
+  var nCats = Object.keys(catsHit).length;
+  $("f-found").textContent = kept.length.toLocaleString("en-US");
+  $("f-cats").textContent  = nCats + " / 18";
+  $("f-chars").textContent = charsRedacted.toLocaleString("en-US");
+
+  /* ---- detection table ---- */
+  var rows = "";
+  for (i=0;i<kept.length;i++){
+    var dd = kept[i], pp = plans[i], cc = CAT_BY_ID[dd.cat];
+    var why = pp.why + (dd.note ? " " + dd.note : "");
+    rows += "<tr>" +
+      '<td class="n">' + String(cc.n).padStart(2, "0") + "</td>" +
+      '<td class="cat">' + escHtml(cc.id) + (dd.sub !== dd.cat ? " · " + escHtml(dd.sub) : "") + "</td>" +
+      '<td><span class="span">' + escHtml(dd.text.length > 46 ? dd.text.slice(0,46) + "…" : dd.text) + "</span></td>" +
+      '<td class="m c-' + dd.conf + '">' + dd.conf + "</td>" +
+      '<td class="m">' + escHtml(dd.rule) + "</td>" +
+      '<td><span class="rep">' + escHtml(pp.redact ? pp.rep : "(retained)") + '</span><span class="why">' + escHtml(why) + "</span></td>" +
+      "</tr>";
+  }
+  if (!rows) rows = '<tr><td colspan="6"><span class="why">No identifiers detected in this text. A clean result is not proof of a clean document — see the limitations below.</span></td></tr>';
+  $("det-body").innerHTML = rows;
+
+  var gazHits = kept.filter(function(d){ return d.rule.indexOf("name-gazetteer") === 0; }).length;
+  var ctxHits = kept.filter(function(d){ return d.cat === "NAME" && d.rule.indexOf("context") === 0; }).length;
+  var subsumed = res.suppressed.filter(function(d){ return d.rule.indexOf("name-gazetteer") === 0; }).length;
+  $("det-deck").textContent =
+    kept.length + " span" + (kept.length === 1 ? "" : "s") + " accepted, " +
+    res.suppressed.length + " overlapping candidate" + (res.suppressed.length === 1 ? "" : "s") + " suppressed by the resolver. " +
+    "Names: " + ctxHits + " by context rule, " + gazHits + " by gazetteer, " +
+    subsumed + " gazetteer hit" + (subsumed === 1 ? "" : "s") + " subsumed by a longer context match.";
+
+  /* ---- coverage ---- */
+  var cov = "";
+  CATS.forEach(function(c){
+    var n = catsHit[c.id] || 0;
+    cov += '<div class="covi' + (n ? " on" : "") + '">' +
+      '<span class="cn">' + String(c.n).padStart(2, "0") + "</span>" +
+      '<span class="cl">' + escHtml(c.label) + "</span>" +
+      '<span class="cc">' + (n ? n : "clean") + "</span></div>";
+  });
+  $("cov").innerHTML = cov;
+
+  /* ---- risk ---- */
+  var r = riskModel(kept, plans, mode, text);
+  $("f-k").textContent   = fmtK(r.k);
+  $("r-k").textContent   = "k ≈ " + fmtK(r.k);
+  var chip = $("r-chip");
+  chip.className = "chip " + r.chip;
+  chip.textContent = r.band + " — " + (r.band === "HIGH" ? "k below 5" : r.band === "MODERATE" ? "k 5 to 11" : "k at or above 11");
+
+  var rb = "";
+  rb += "<tr><td>Geography</td><td>" + escHtml(r.geoVal) + '</td><td class="n">population ' + r.N.toLocaleString("en-US") + "</td><td>" + escHtml(r.geoBasis) + "</td></tr>";
+  r.qis.forEach(function(q){
+    rb += "<tr><td>" + escHtml(q.name) + "</td><td>" + escHtml(q.value) + '</td><td class="n">' + fmtP(q.p) + "</td><td>" + escHtml(q.basis) + "</td></tr>";
+  });
+  if (!r.qis.length) rb += '<tr><td colspan="4"><span class="why">No person-level quasi-identifiers survive this redaction.</span></td></tr>';
+  $("r-body").innerHTML = rb;
+
+  var mathStr = "k = " + r.N.toLocaleString("en-US");
+  r.qis.forEach(function(q){ mathStr += " × " + fmtP(q.p); });
+  mathStr += " = " + fmtK(r.k) + ". " +
+    "The model assumes the quasi-identifiers are independent and uniformly distributed across the population denominator, which is a simplification in both directions: real distributions are skewed, and real registers are incomplete.";
+  $("r-math").textContent = mathStr;
+
+  /* reasoning sentence */
+  var names = r.qis.map(function(q){ return q.name.toLowerCase() + " (" + q.value + ")"; });
+  var s;
+  var methodName = mode === "sh" ? "Safe Harbor" : "Limited Data Set";
+  if (!r.qis.length && r.geoKey === "US"){
+    s = "Under " + methodName + ", no geography, sex or age information survives this text, so there is nothing left to link against an external register. That is the best case and it is rare — most real notes carry at least one of the three.";
+  } else {
+    s = "Under " + methodName + ", " + (names.length ? names.length + " person-level quasi-identifier" + (names.length === 1 ? "" : "s") + " survive" + (names.length === 1 ? "s" : "") + " — " + names.join(", ") + " — " : "no person-level quasi-identifiers survive, ") +
+        "against a released geography of " + r.geoVal + ". " +
+        "Modelled over a population of " + r.N.toLocaleString("en-US") + " (" + r.geoBasis + "), the expected equivalence class is about " + fmtK(r.k) + " people, which places this record in the " + r.band + " band.";
+  }
+  if (r.zipRestricted) s += " The ZIP prefix in this note is on the restricted-population list, so it was zeroed rather than retained — which is why the geographic denominator falls back to a wider unit.";
+  if (r.serviceFull) s += " Full service dates also survive. Visit dates are not in a voter roll, but they are known to anyone present at the encounter and to anyone who read a local news report, so the band is downgraded one step for date-of-service linkage.";
+  else if (r.serviceYear) s += " The service year " + r.serviceYear + " survives; a year alone narrows a cohort but is not a population attribute, so it is reported rather than scored.";
+  if (!r.sexCue) s += " No sex cue was found; if the note were rewritten with a pronoun, k would halve.";
+  $("r-sentence").textContent = s;
+
+  drawMeter(r.k, r.band);
+
+  /* ---- human review queue ---- */
+  var pool = kept.map(function(d, ix){ return {d:d, p:plans[ix]}; })
+    .filter(function(x){ return x.d.conf === "low" || x.d.conf === "medium" || x.d.cat === "OTHERID" || !x.p.redact; });
+  var rnd = mulberry32(fnv1a(text + "|" + mode) ^ 0x1352026);
+  for (i = pool.length - 1; i > 0; i--){
+    var j = Math.floor(rnd() * (i + 1));
+    var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+  }
+  var pick = pool.slice(0, 5);
+  var q = "";
+  pick.forEach(function(x){
+    var reason = x.d.cat === "OTHERID" ? "Category 18 requires human judgement — no rule can decide whether a code or a characteristic is identifying."
+      : !x.p.redact ? "Detected but lawfully retained under the selected method. Confirm the retention is acceptable for this release."
+      : x.d.conf === "low" ? "Matched on shape alone, with no confirming context or checksum."
+      : "Matched on surrounding context, which is the part most easily broken by dictation or formatting.";
+    q += '<div class="qi"><div class="qk">' + escHtml(CAT_BY_ID[x.d.cat].id) + " · " + escHtml(x.d.conf) + "</div>" +
+         '<div class="qv"><code>' + escHtml(x.d.text.length > 60 ? x.d.text.slice(0,60) + "…" : x.d.text) + "</code> — " +
+         escHtml(reason) + " Rule: " + escHtml(x.d.rule) + ".</div></div>";
+  });
+  if (!pick.length) q = '<div class="qi"><div class="qk">Queue empty</div><div class="qv">No low- or medium-confidence spans in this text. A reviewer should still read the document end to end — an empty queue means the rules found nothing to doubt, not that nothing was missed.</div></div>';
+  $("queue").innerHTML = q;
+}
+
+/* ---- inline SVG risk meter — generated from the data, no library ---- */
+function drawMeter(k, band){
+  var svg = $("r-meter");
+  var W = 720, X0 = 48, X1 = 680, Y = 46;
+  function xOf(v){
+    var lv = Math.log(Math.max(1e-2, Math.min(1e8, v))) / Math.LN10;
+    return X0 + (X1 - X0) * (lv + 2) / 10;
+  }
+  var parts = ['<title id="r-meter-t">Estimated equivalence class size on a logarithmic scale, with the high, moderate and low bands labelled</title>'];
+  var x5 = xOf(5), x11 = xOf(11);
+
+  /* zone bars — each is also named in text below, so the band is never colour-alone */
+  parts.push('<rect x="' + X0 + '" y="' + (Y-3) + '" width="' + (x5-X0) + '" height="6" fill="var(--bad)"></rect>');
+  parts.push('<rect x="' + x5 + '" y="' + (Y-3) + '" width="' + (x11-x5) + '" height="6" fill="var(--warn)"></rect>');
+  parts.push('<rect x="' + x11 + '" y="' + (Y-3) + '" width="' + (X1-x11) + '" height="6" fill="var(--ok)"></rect>');
+
+  /* log ticks */
+  var ticks = [[0.01,"0.01"],[0.1,"0.1"],[1,"1"],[10,"10"],[100,"100"],[1000,"1k"],[1e4,"10k"],[1e5,"100k"],[1e6,"1M"],[1e7,"10M"],[1e8,"100M"]];
+  ticks.forEach(function(t){
+    var x = xOf(t[0]);
+    parts.push('<line x1="' + x.toFixed(1) + '" y1="' + (Y+7) + '" x2="' + x.toFixed(1) + '" y2="' + (Y+12) + '" stroke="var(--rule-2)" stroke-width="1"></line>');
+    parts.push('<text class="ax" x="' + x.toFixed(1) + '" y="' + (Y+26) + '" text-anchor="middle">' + t[1] + "</text>");
+  });
+
+  /* zone labels with their numeric boundaries */
+  parts.push('<text class="zn" x="' + X0 + '" y="' + (Y-12) + '" text-anchor="start">HIGH · k&lt;5</text>');
+  parts.push('<text class="zn" x="' + ((x5+x11)/2).toFixed(1) + '" y="' + (Y-24) + '" text-anchor="middle">MODERATE · 5–11</text>');
+  parts.push('<line x1="' + ((x5+x11)/2).toFixed(1) + '" y1="' + (Y-20) + '" x2="' + ((x5+x11)/2).toFixed(1) + '" y2="' + (Y-6) + '" stroke="var(--rule-2)" stroke-width="1"></line>');
+  parts.push('<text class="zn" x="' + X1 + '" y="' + (Y-12) + '" text-anchor="end">LOW · k≥11</text>');
+
+  /* marker, directly labelled */
+  var mx = xOf(k);
+  parts.push('<line x1="' + mx.toFixed(1) + '" y1="' + (Y-16) + '" x2="' + mx.toFixed(1) + '" y2="' + (Y+4) + '" stroke="var(--ink)" stroke-width="1"></line>');
+  parts.push('<polygon points="' + (mx-5).toFixed(1) + ',' + (Y+4) + ' ' + (mx+5).toFixed(1) + ',' + (Y+4) + ' ' + mx.toFixed(1) + ',' + (Y+13) + '" fill="var(--accent)"></polygon>');
+  var anchor = mx < 110 ? "start" : (mx > W - 110 ? "end" : "middle");
+  var lx = mx < 110 ? X0 : (mx > W - 110 ? X1 : mx);
+  parts.push('<text class="mk" x="' + lx.toFixed(1) + '" y="' + (Y+50) + '" text-anchor="' + anchor + '">THIS RECORD · k ≈ ' + fmtK(k) + " · " + band + "</text>");
+
+  svg.innerHTML = parts.join("");
+}
+
+/* =====================================================================
+   10. SAMPLES — synthetic, written for this demonstration
+   ===================================================================== */
+var SAMPLE_DISCHARGE =
+"DISCHARGE SUMMARY - ORAL & MAXILLOFACIAL SURGERY (SYNTHETIC RECORD)\n" +
+"\n" +
+"Patient: Marcus Delgado          MRN: 4417-88203\n" +
+"DOB: 03/14/1957                  SSN: 412-88-9330\n" +
+"Admitted: 2026-01-19             Discharged: January 23, 2026\n" +
+"Address: 1428 Rosewood Terrace, Apt 3B, Dearborn, MI 48124\n" +
+"Home phone: (313) 555-0146       Mobile: 313.555.0192\n" +
+"Email: m.delgado47@examplemail.com\n" +
+"Insurance: Meridian Health Plan, member ID MHP-880-421-77, group 44812\n" +
+"Billing account no. ACCT-90114882\n" +
+"Attending: Dr. Priya Raghunathan, DEA BR1234563, NPI 1497358238\n" +
+"\n" +
+"HISTORY OF PRESENT ILLNESS\n" +
+"Mr. Delgado is a 69-year-old man who presented to the emergency department\n" +
+"on 19 Jan 26 following a motor vehicle collision on Michigan Ave. The\n" +
+"vehicle, VIN 1HGCM82633A004352, was documented by the trauma team, and the\n" +
+"license plate DFR-4821 was recorded in the incident note. He sustained a\n" +
+"displaced left mandibular angle fracture.\n" +
+"\n" +
+"HOSPITAL COURSE\n" +
+"Open reduction and internal fixation was performed on 1-20-26 by Dr.\n" +
+"Raghunathan. A titanium plate was implanted, device serial no. SN-TX4490-2211,\n" +
+"lot 7C-2026. The post-operative course was uncomplicated.\n" +
+"A full-face clinical photograph was taken for the record on 1/22/26.\n" +
+"\n" +
+"His mother, Eleanor Delgado, aged 94, was present at discharge and declined\n" +
+"the interpreter service.\n" +
+"\n" +
+"DISCHARGE PLAN\n" +
+"Follow-up in the OMFS clinic on 02/06/2026. Patient enrolled in the portal at\n" +
+"https://portal.example-health.org/mdelgado; enrolment used voiceprint\n" +
+"verification and a fingerprint check at the kiosk. The portal session\n" +
+"originated from IP 10.14.220.87 (IPv6 2001:db8:85a3::8a2e:370:7334).\n" +
+"Records may be faxed to (313) 555-0177.\n" +
+"Accession no. ACC-2026-0119-4471. Study ID OMFS-TRIAL-0042.\n" +
+"He is the only patient in the county enrolled in this device registry.\n" +
+"\n" +
+"Signed: Priya Raghunathan, DDS, MD - 01/23/2026\n" +
+"Referring: Dr. Alan Whitfield, Riverbend Dental Associates";
+
+var SAMPLE_REFERRAL =
+"REFERRAL LETTER (SYNTHETIC RECORD)\n" +
+"\n" +
+"Riverbend Dental Associates\n" +
+"88 Mill Street, Charlestown, NH 03603\n" +
+"Tel 603-555-0123 - Fax 603-555-0188 - referrals@example-dental.net\n" +
+"\n" +
+"Chart first opened 4 Mar 82. Date of this letter: 12/02/2025.\n" +
+"\n" +
+"Dear Dr. Ramirez,\n" +
+"\n" +
+"RE: Ms. Harriet Osei, DOB 7/3/1935, MRN 88-4412-C\n" +
+"\n" +
+"Thank you for agreeing to see Ms. Osei, who is 90 years old and lives at\n" +
+"88 Mill Street, Charlestown, NH 03603. Her Medicare number is 1EG4-TE5-MK73\n" +
+"and her secondary policy is with a commercial payer, subscriber A-4471-90228.\n" +
+"\n" +
+"She was last seen on 2025-11-18. Panoramic imaging is available on the\n" +
+"practice server at http://images.example-dental.net/case/4412.\n" +
+"A retinal scan was recorded at registration for identity verification.\n" +
+"The scanner reports device ID DEV-99120-AA.\n" +
+"\n" +
+"Her daughter, Mrs. Adaeze Osei, can be reached on 603.555.0164 or at\n" +
+"a.osei@examplemail.com.\n" +
+"\n" +
+"Yours sincerely,\n" +
+"Alan Whitfield BDS\n" +
+"Licence no. NH-DEN-40118";
+
+/* =====================================================================
+   11. WIRING
+   ===================================================================== */
+var timer = null;
+function schedule(){
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(analyse, 200);
+}
+function setMode(m){
+  state.mode = m;
+  $("m-sh").setAttribute("aria-pressed", m === "sh" ? "true" : "false");
+  $("m-lds").setAttribute("aria-pressed", m === "lds" ? "true" : "false");
+  analyse();
+}
+function say(msg){
+  var el = $("confirm");
+  el.textContent = msg;
+  setTimeout(function(){ if (el.textContent === msg) el.textContent = ""; }, 3200);
+}
+
+$("src").addEventListener("input", schedule);
+$("m-sh").addEventListener("click", function(){ setMode("sh"); });
+$("m-lds").addEventListener("click", function(){ setMode("lds"); });
+$("s-1").addEventListener("click", function(){ $("src").value = SAMPLE_DISCHARGE; analyse(); say("Discharge summary loaded"); });
+$("s-2").addEventListener("click", function(){ $("src").value = SAMPLE_REFERRAL; analyse(); say("Referral letter loaded"); });
+$("s-clear").addEventListener("click", function(){ $("src").value = ""; analyse(); say("Cleared"); });
+
+$("copy").addEventListener("click", function(){
+  var txt = state.deid || "";
+  function fallback(){
+    var ta = document.createElement("textarea");
+    ta.className = "offscreen";
+    ta.value = txt;
+    ta.setAttribute("readonly", "readonly");
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    say(ok ? "De-identified text copied to clipboard" : "Copy blocked — select the right-hand pane and copy manually");
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){
+      say("De-identified text copied to clipboard");
+    })["catch"](fallback);
+  } else {
+    fallback();
+  }
+});
+
+$("lim-gaz").textContent = GAZ_COUNT + " personal-name";
+
+/* Render immediately with the preloaded sample — never a blank first screen. */
+$("src").value = SAMPLE_DISCHARGE;
+analyse();
+
+})();
+</script>
+</body>
+</html>

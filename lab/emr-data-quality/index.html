@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EMR Data Quality Profiler — Nikhila Veeramalla</title>
+<meta name="description" content="Profiles a synthetic EHR dataset against the Kahn et al. harmonised data-quality framework — completeness, conformance, plausibility — and rules on whether the data is fit to train a model. Demonstration only.">
+<meta name="theme-color" content="#fbfaf8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%236b4e12'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='33' font-weight='600' fill='%23fbfaf8' text-anchor='middle'%3ENV%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fbfaf8; --band:#f3f1eb; --ink:#14120f; --body:#3c3630; --muted:#6f675d;
+  --rule:#e2ded4; --rule-2:#cfc9bc; --accent:#6b4e12;
+  --ok:#1f5d3a; --warn:#8a5a12; --bad:#8c2f24;
+  --rail:180px; --max:1160px; --gut:32px;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);color:var(--body);
+  font-family:var(--sans);font-size:17px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:var(--accent);color:var(--paper)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+@media(max-width:640px){:root{--gut:24px}}
+
+h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:400;letter-spacing:-.018em}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.02;letter-spacing:-.032em;font-weight:300}
+h2{font-size:clamp(21px,3.2vw,40px);line-height:1.16}
+h3{font-size:21px;line-height:1.35;font-weight:500}
+p{max-width:37rem}
+
+.label,.eyebrow{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+}
+.label .num{color:var(--accent)}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.n,th.n,.f-sev,.summary .v{font-variant-numeric:tabular-nums lining-nums}
+
+/* ---------------- masthead ---------------- */
+.mast{border-bottom:1px solid var(--rule);background:var(--paper)}
+.mast-in{max-width:var(--max);margin:0 auto;padding:16px var(--gut);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 24px}
+.mast a.back{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:3px;
+  transition:color .14s,border-color .14s;
+}
+.mast a.back:hover{color:var(--ink);border-bottom-color:var(--accent)}
+.mast .toolname{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);text-align:right}
+
+/* ---------------- title ---------------- */
+.titleblock{padding:72px 0 56px}
+@media(max-width:900px){.titleblock{padding:56px 0 40px}}
+.titleblock .eyebrow{display:block;margin-bottom:24px}
+.titleblock .lede{margin-top:24px;color:var(--body);max-width:37rem}
+
+section{padding:56px 0;scroll-margin-top:24px}
+.band{background:var(--band);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.sec-head{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;align-items:baseline;padding-bottom:24px;border-bottom:1px solid var(--rule)}
+@media(max-width:820px){.sec-head{grid-template-columns:1fr;gap:16px}}
+.sec-head .deck{color:var(--muted);max-width:37rem;margin-top:16px}
+
+/* ---------------- steps ---------------- */
+.steps{list-style:none;counter-reset:s;margin-top:32px;border-top:1px solid var(--rule)}
+.steps li{
+  counter-increment:s;display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;
+  padding:24px 0;border-bottom:1px solid var(--rule);align-items:baseline;
+}
+@media(max-width:820px){.steps li{grid-template-columns:1fr;gap:8px}}
+.steps li::before{
+  content:"Step " counter(s,decimal-leading-zero);
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);
+  font-variant-numeric:tabular-nums lining-nums;
+}
+.steps .what{color:var(--body);max-width:37rem}
+.steps .what strong{font-weight:500;color:var(--ink)}
+.steps .what code{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:0}
+
+/* ---------------- notices ---------------- */
+.notices{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--rule);margin-bottom:32px}
+@media(max-width:760px){.notices{grid-template-columns:1fr}}
+.notice{padding:16px 24px}
+.notice + .notice{border-left:1px solid var(--rule)}
+@media(max-width:760px){.notice + .notice{border-left:0;border-top:1px solid var(--rule)}}
+.notice .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.notice .v{font-size:14px;line-height:1.6;margin-top:8px;color:var(--body);max-width:none}
+
+/* ---------------- tool ---------------- */
+.tool{border:1px solid var(--rule);background:var(--paper)}
+.panel{border-top:1px solid var(--rule);padding:32px 24px}
+.panel:first-child{border-top:0}
+@media(max-width:640px){.panel{padding:24px 16px}}
+.panel-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:24px}
+.panel-head .eyebrow{display:block}
+.panel-note{font-size:14px;line-height:1.6;color:var(--muted);max-width:none;margin-top:16px}
+.panel-note code{font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:0}
+
+.summary{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule)}
+@media(max-width:760px){.summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:400px){.summary{grid-template-columns:1fr}}
+.summary div{padding:16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.summary .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.summary .v{font-family:var(--serif);font-size:40px;line-height:1.1;color:var(--ink);margin-top:8px;font-variant-numeric:tabular-nums lining-nums;letter-spacing:-.02em}
+.summary .v.sm{font-size:21px;line-height:1.4}
+
+/* controls */
+.controls{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center}
+@media(max-width:760px){.controls{grid-template-columns:1fr;gap:24px}}
+.ctl .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:12px}
+.ctl .k b{color:var(--accent);font-weight:500;font-variant-numeric:tabular-nums lining-nums}
+input[type=range]{width:100%;accent-color:var(--accent);height:24px}
+.scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums lining-nums}
+.toggle{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink);cursor:pointer}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent)}
+
+/* verdict banner */
+.verdict{border:1px solid var(--rule-2);padding:24px}
+.verdict .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.verdict .v{font-family:var(--serif);font-size:clamp(21px,3.2vw,40px);line-height:1.16;margin-top:8px;color:var(--ink)}
+.verdict.is-unfit{border-color:var(--bad)}
+.verdict.is-unfit .v{color:var(--bad)}
+.verdict.is-caution{border-color:var(--warn)}
+.verdict.is-caution .v{color:var(--warn)}
+.verdict.is-fit{border-color:var(--ok)}
+.verdict.is-fit .v{color:var(--ok)}
+.verdict .sub{margin-top:16px;font-size:14px;line-height:1.6;color:var(--body);max-width:none}
+
+/* action list for the steering committee */
+.calls{margin-top:32px;border-top:1px solid var(--rule)}
+.call{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;padding:24px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+@media(max-width:820px){.call{grid-template-columns:1fr;gap:12px}}
+.call .who{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase}
+.call .who .fld{color:var(--ink);display:block;letter-spacing:.06em;text-transform:none;font-size:14px;margin-bottom:8px}
+.call .why{color:var(--body);max-width:37rem}
+.act-exclude{color:var(--bad)}
+.act-repair{color:var(--warn)}
+.act-watch{color:var(--accent)}
+
+/* tables */
+.scroll{overflow-x:auto;border-top:1px solid var(--rule);-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:14px}
+.t-fields{min-width:940px}
+.t-num{min-width:900px}
+.t-truth{min-width:760px}
+th{
+  font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:12px 16px 12px 0;border-bottom:1px solid var(--rule-2);vertical-align:bottom;
+}
+td{padding:12px 16px 12px 0;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.5}
+th.n,td.n{text-align:right;padding-right:24px}
+tbody tr:hover td{background:var(--band)}
+td.fld{font-family:var(--mono);font-size:14px;letter-spacing:0;color:var(--ink);white-space:nowrap}
+td.reason{color:var(--muted);min-width:280px}
+.pill{
+  display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  padding:0 8px;line-height:2;border:1px solid currentColor;white-space:nowrap;
+}
+.p-fit{color:var(--ok)}
+.p-caution{color:var(--warn)}
+.p-unfit{color:var(--bad)}
+.empty{padding:24px 0;font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+
+/* svg */
+svg{display:block}
+.hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.hm-cell{fill:var(--accent)}
+.hm-grid{fill:none;stroke:var(--rule);stroke-width:1}
+.hm-txt{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+.hm-txt-i{font-family:var(--mono);font-size:11px;fill:var(--paper)}
+.hm-lab{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+.hm-fld{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+.spark-bar{fill:var(--rule-2)}
+.spark-base{stroke:var(--rule-2);stroke-width:1}
+.spark-fence{stroke:var(--accent);stroke-width:1}
+.spark-med{stroke:var(--ink);stroke-width:1}
+.sev-bg{fill:var(--rule)}
+.sev-lo{fill:var(--ok)}
+.sev-mid{fill:var(--warn)}
+.sev-hi{fill:var(--bad)}
+
+/* findings */
+.finding{padding:24px 0;border-bottom:1px solid var(--rule)}
+.finding:last-child{border-bottom:0}
+.f-top{display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;justify-content:space-between}
+.f-id{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent)}
+.f-sev{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.13em;color:var(--muted);font-variant-numeric:tabular-nums lining-nums}
+.f-title{margin-top:12px;font-family:var(--serif);font-size:21px;line-height:1.35;color:var(--ink)}
+.f-ev{margin-top:12px;list-style:none}
+.f-ev li{position:relative;padding-left:24px;font-size:14px;line-height:1.6;color:var(--body)}
+.f-ev li::before{content:"";position:absolute;left:0;top:.7em;width:10px;height:1px;background:var(--rule-2)}
+.f-ev li.calc{font-family:var(--mono);color:var(--muted);letter-spacing:0}
+.f-rx{margin-top:12px;font-size:14px;line-height:1.6;color:var(--body);max-width:none}
+.f-rx b{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:500}
+
+.body-copy{margin-top:24px;margin-left:calc(var(--rail) + 40px)}
+.body-copy p + p{margin-top:16px}
+@media(max-width:820px){.body-copy{margin-left:0}}
+
+footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:56px}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+
+@media(prefers-reduced-motion:reduce){
+  *{transition:none !important}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <div class="mast-in">
+    <a class="back" href="../../">Nikhila Veeramalla</a>
+    <span class="toolname">EMR Data Quality Profiler</span>
+  </div>
+</div>
+
+<header class="titleblock">
+  <div class="wrap">
+    <span class="eyebrow">Lab / 01 &nbsp;— &nbsp;Data readiness</span>
+    <h1>Is this data<br>fit to train on?</h1>
+    <p class="lede">Profiles an EHR-style extract against the Kahn harmonised data-quality framework — completeness, conformance, plausibility — and returns a per-field and dataset verdict. The check most healthcare AI programmes skip, then die on.</p>
+  </div>
+</header>
+
+<section class="band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">01</span> &nbsp;How it works</span>
+      <div>
+        <h2>Six passes over the extract.</h2>
+        <p class="deck">Every number on this page is computed in your browser from the synthetic extract below. Nothing is hard-coded.</p>
+      </div>
+    </div>
+    <ol class="steps">
+      <li><div class="what"><strong>Generate a reproducible extract.</strong> 3,000 synthetic encounters, 26 fields, from a seeded <code>mulberry32</code> PRNG. Known defects are planted at known row counts so the profiler's output can be scored against ground truth at the bottom of the page.</div></li>
+      <li><div class="what"><strong>Completeness.</strong> Per-field missing rate; a Pearson chi-square test of independence between missingness and <code>payerType</code> with Cramér's V as effect size; record-level completeness against a defined core field set. Disguised missingness — codes such as <code>Unknown</code> that are conformant but carry no signal — is counted separately.</div></li>
+      <li><div class="what"><strong>Conformance</strong>, in Kahn's three subcategories. <em>Value:</em> regex and value-set checks, including ICD-10-CM syntax <code>^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$</code>, 5-digit CPT, and a documented subset of the NUBC UB-04 patient discharge status set. <em>Relational:</em> every encounter's <code>patientId</code> must resolve to the patient dimension. <em>Computational:</em> <code>bmi</code> recomputed from <code>weightKg / (heightCm/100)²</code> and compared at a 1.0 kg/m² tolerance.</div></li>
+      <li><div class="what"><strong>Plausibility.</strong> <em>Uniqueness:</em> duplicate <code>encounterId</code> keys, plus blocked pairwise comparison for near-duplicate patients. <em>Atemporal:</em> physiologic bounds per field, from the range table shown in the tool, plus the cross-field rule that systolic must exceed diastolic. <em>Temporal:</em> discharge before admit, birth after admit, negative stays, and stated length of stay against the date arithmetic.</div></li>
+      <li><div class="what"><strong>Distributional checks</strong> — an extension beyond Kahn's three named plausibility subcategories, and labelled as such. One-dimensional Lloyd k-means (k=2) in log space with Ashman's D for bimodality, median-ratio matching against known unit-conversion factors, day-of-month chi-square for date heaping, and Tukey 1.5×IQR outlier fences.</div></li>
+      <li><div class="what"><strong>Score and rule.</strong> Each firing check emits a finding with a severity derived from its own measured rate — the arithmetic is printed on every finding. Field verdict is the highest severity attributed to it: 70+ is <span class="p-unfit">UNFIT</span>, 40+ is <span class="p-caution">CAUTION</span>. The dataset verdict aggregates, and separates fields that must be excluded from fields that can be repaired.</div></li>
+    </ol>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">02</span> &nbsp;The profiler</span>
+      <div>
+        <h2>Live profile.</h2>
+        <p class="deck">Loaded and scored on page load. Move the severity threshold to see which findings survive a stricter or looser bar.</p>
+      </div>
+    </div>
+
+    <div class="notices" role="note">
+      <div class="notice">
+        <div class="k">Synthetic data</div>
+        <div class="v">Synthetic records. No real patient data is used anywhere in this tool. The extract is generated in your browser from a fixed seed and never leaves it.</div>
+      </div>
+      <div class="notice">
+        <div class="k">Scope</div>
+        <div class="v">Demonstration only. Not validated for clinical or compliance use. This is not a certified compliance control, not a quality-management system record, and not a medical device.</div>
+      </div>
+    </div>
+
+    <div class="tool" id="tool">
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Extract</span><span class="mono" id="seedline">seed —</span></div>
+        <div class="summary" id="summary"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Controls</span></div>
+        <div class="controls">
+          <div class="ctl">
+            <label class="k" for="sev">Severity threshold &nbsp;<b id="sevOut">30</b></label>
+            <input type="range" id="sev" min="0" max="100" step="5" value="30" aria-describedby="sevhelp">
+            <div class="scale"><span>0 — show everything</span><span>100 — only maximal</span></div>
+          </div>
+          <div class="ctl">
+            <span class="k">Table</span>
+            <label class="toggle" for="showpass"><input type="checkbox" id="showpass" checked> Show passing fields</label>
+          </div>
+        </div>
+        <p class="panel-note" id="sevhelp">Only findings at or above the threshold count toward field and dataset verdicts. Severity is computed per check from the measured defect rate; the arithmetic is printed on each finding.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Dataset verdict</span></div>
+        <div id="verdict"></div>
+        <div class="calls" id="calls"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Per-field data quality</span><span class="mono" id="fieldcount"></span></div>
+        <div class="scroll"><table class="t-fields"><thead><tr>
+          <th scope="col">Field</th><th scope="col">Kind</th>
+          <th scope="col" class="n">Missing</th><th scope="col" class="n">Conformance fail</th><th scope="col" class="n">Plausibility fail</th>
+          <th scope="col">Verdict</th><th scope="col">Driving reason</th>
+        </tr></thead><tbody id="fieldrows"></tbody></table></div>
+        <p class="panel-note">Conformance and plausibility rates are over <em>present</em> values, not all rows — a field that is 90% missing can still be 100% conformant on what is there, and reading those two columns together is the point. A dash means the denominator was zero.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Missingness by payer</span><span class="mono">Field × payerType</span></div>
+        <div class="hm-wrap" id="heatmap"></div>
+        <p class="panel-note" id="hmnote"></p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Numeric distributions</span><span class="mono">Tukey 1.5 × IQR fence</span></div>
+        <div class="scroll"><table class="t-num"><thead><tr>
+          <th scope="col">Field</th><th scope="col">Distribution</th><th scope="col" class="n">n</th>
+          <th scope="col" class="n">Median (IQR)</th><th scope="col" class="n">Plausible range</th>
+          <th scope="col" class="n">Tukey fence</th><th scope="col" class="n">Out of range</th><th scope="col" class="n">Beyond fence</th>
+        </tr></thead><tbody id="numrows"></tbody></table></div>
+        <p class="panel-note">Sparklines are 22-bin histograms clipped at the 1st and 99th percentile so a single impossible value cannot flatten the axis. Vertical accent rules mark the lower and upper Tukey fences; the dark rule is the median. Plausible ranges are survivable-extreme bounds for a recorded human observation, not clinical reference ranges — a value inside the range can still be clinically abnormal, and a value outside it is not "abnormal", it is impossible. The Tukey fence is arithmetic on the quartiles and nothing else, so on a skewed or bounded column it lands outside the plausible range (a negative creatinine fence, an SpO₂ fence above 100%). That is the rule behaving correctly, and it is why the fence screens for attention rather than deciding anything. <code>los</code> is the one exception in the table: its out-of-range count is shown for reference but reported as a finding under temporal plausibility, so a negative stay is not counted twice.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Findings</span><span class="mono" id="findcount"></span></div>
+        <div id="findings"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="eyebrow">Planted vs flagged</span><span class="mono">Detector scoring</span></div>
+        <p class="panel-note">Because the extract is synthetic, ground truth is known. This is how a profiler should be validated before anyone trusts its verdicts — and where flagged exceeds planted, the reason is stated rather than hidden.</p>
+        <div class="scroll"><table class="t-truth"><thead><tr>
+          <th scope="col">Planted defect</th><th scope="col">Check</th>
+          <th scope="col" class="n">Planted</th><th scope="col" class="n">Flagged</th><th scope="col">Difference explained</th>
+        </tr></thead><tbody id="truthrows"></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="label"><span class="num">03</span> &nbsp;Method &amp; limitations</span>
+      <div><h2>What this catches, and what it cannot.</h2></div>
+    </div>
+    <div class="body-copy">
+      <p>The framework is Kahn et al., <em>A Harmonized Data Quality Assessment Terminology and Framework for the Secondary Use of Electronic Health Record Data</em> (EGEMS, 2016). Its dimensions and subcategories are used as published; the distributional checks are an addition, labelled as such, because Kahn names only uniqueness, atemporal and temporal under plausibility.</p>
+      <p>It catches what is visible <em>inside</em> the extract — absent values, broken formats, rows that contradict themselves, two populations in one column. That is verification, not validation. It cannot tell you whether the extract represents the patients you think it does, whether a code was clinically right, or whether a cohort is silently absent.</p>
+      <p>Known limits: value sets are pinned to a documented subset, where production would bind to current NUBC, ICD-10-CM and CPT releases; the chi-square is suppressed below an expected cell of five and carries no multiple-comparison correction; near-duplicate matching produces chance pairs by construction; the temperature ratio holds only near body temperature; and every threshold is a defensible default, not a standard.</p>
+      <p>A human stays in the loop at three points — agreeing ranges and value sets, adjudicating duplicate and rare-cell findings, and signing the exclude-or-repair decision. The profiler ranks and evidences. It does not decide.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div>Nikhila Veeramalla — AI Product Manager, Healthcare</div>
+    <div>Synthetic data · Demonstration only</div>
+  </div>
+</footer>
+
+<script>
+/* ===== COMPUTE START ===== */
+"use strict";
+
+/* ---------------------------------------------------------------
+   1. Seeded PRNG + statistics. No Math.rand[o]m anywhere on this page.
+   --------------------------------------------------------------- */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function makeNormal(r){
+  var spare = null;
+  return function(mu, sd){
+    if (spare !== null){ var s = spare; spare = null; return mu + sd * s; }
+    var u, v, q;
+    do { u = r()*2-1; v = r()*2-1; q = u*u + v*v; } while (q >= 1 || q === 0);
+    var m = Math.sqrt(-2 * Math.log(q) / q);
+    spare = v * m;
+    return mu + sd * u * m;
+  };
+}
+function clamp(x, lo, hi){ return x < lo ? lo : (x > hi ? hi : x); }
+function r1(x){ return Math.round(x * 10) / 10; }
+function r2(x){ return Math.round(x * 100) / 100; }
+
+function sortNum(arr){ return arr.slice().sort(function(a,b){ return a - b; }); }
+function quantile(sorted, p){
+  var n = sorted.length;
+  if (!n) return null;
+  if (n === 1) return sorted[0];
+  var h = (n - 1) * p, lo = Math.floor(h), hi = Math.ceil(h);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (h - lo) * (sorted[hi] - sorted[lo]);
+}
+function mean(a){ if(!a.length) return null; var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s/a.length; }
+function variance(a){
+  if (a.length < 2) return 0;
+  var m = mean(a), s = 0;
+  for (var i=0;i<a.length;i++){ var d = a[i]-m; s += d*d; }
+  return s / a.length;
+}
+
+/* Lanczos log-gamma, then the regularized lower incomplete gamma P(s,x)
+   by series / continued fraction. Used only for the chi-square tail. */
+function gammaln(x){
+  var g = [676.5203681218851,-1259.1392167224028,771.32342877765313,
+           -176.61502916214059,12.507343278686905,-0.13857109526572012,
+           9.9843695780195716e-6,1.5056327351493116e-7];
+  if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - gammaln(1 - x);
+  x -= 1;
+  var a = 0.99999999999980993, t = x + 7.5;
+  for (var i = 0; i < 8; i++) a += g[i] / (x + i + 1);
+  return 0.5*Math.log(2*Math.PI) + (x + 0.5)*Math.log(t) - t + Math.log(a);
+}
+function lowerRegGamma(s, x){
+  if (!(s > 0) || x < 0 || !isFinite(x)) return NaN;
+  if (x === 0) return 0;
+  if (x < s + 1){
+    var ap = s, sum = 1/s, del = sum;
+    for (var n = 0; n < 1000; n++){
+      ap += 1; del *= x/ap; sum += del;
+      if (Math.abs(del) < Math.abs(sum) * 1e-15) break;
+    }
+    var v = sum * Math.exp(-x + s*Math.log(x) - gammaln(s));
+    return clamp(v, 0, 1);
+  }
+  var FPMIN = 1e-300, b = x + 1 - s, c = 1/FPMIN, d = 1/b, h = d;
+  for (var i = 1; i <= 1000; i++){
+    var an = -i * (i - s);
+    b += 2;
+    d = an*d + b; if (Math.abs(d) < FPMIN) d = FPMIN;
+    c = b + an/c;  if (Math.abs(c) < FPMIN) c = FPMIN;
+    d = 1/d;
+    var de = d*c; h *= de;
+    if (Math.abs(de - 1) < 1e-15) break;
+  }
+  var q = Math.exp(-x + s*Math.log(x) - gammaln(s)) * h;
+  return clamp(1 - q, 0, 1);
+}
+function chiSqUpperP(chi2, df){
+  if (!(chi2 > 0) || !(df > 0)) return 1;
+  return clamp(1 - lowerRegGamma(df/2, chi2/2), 0, 1);
+}
+
+/* One-dimensional Lloyd k-means, k = 2, deterministic seeding at the
+   quartiles. Returns cluster summaries or null if it cannot separate. */
+function twoMeans(values){
+  var v = sortNum(values);
+  if (v.length < 30) return null;
+  if (v[0] === v[v.length-1]) return null;
+  var c1 = quantile(v, 0.25), c2 = quantile(v, 0.75);
+  if (c1 === c2){ c1 = v[0]; c2 = v[v.length-1]; }
+  var i, a, s1, n1, s2, n2;
+  for (var it = 0; it < 200; it++){
+    s1 = 0; n1 = 0; s2 = 0; n2 = 0;
+    for (i = 0; i < v.length; i++){
+      a = Math.abs(v[i]-c1) <= Math.abs(v[i]-c2) ? 0 : 1;
+      if (a === 0){ s1 += v[i]; n1++; } else { s2 += v[i]; n2++; }
+    }
+    if (n1 === 0 || n2 === 0) return null;
+    var m1 = s1/n1, m2 = s2/n2;
+    if (Math.abs(m1-c1) < 1e-12 && Math.abs(m2-c2) < 1e-12){ c1 = m1; c2 = m2; break; }
+    c1 = m1; c2 = m2;
+  }
+  var lo = [], hi = [];
+  for (i = 0; i < v.length; i++){
+    if (Math.abs(v[i]-c1) <= Math.abs(v[i]-c2)) lo.push(v[i]); else hi.push(v[i]);
+  }
+  if (!lo.length || !hi.length) return null;
+  if (c1 > c2){ var tl = lo; lo = hi; hi = tl; var tc = c1; c1 = c2; c2 = tc; }
+  var vlo = variance(lo), vhi = variance(hi);
+  var denom = Math.sqrt(vlo + vhi);
+  /* Ashman's D. A forced 2-means split of a unimodal Gaussian yields
+     D approximately 2.65, so the bimodality gate is set above that. */
+  var D = denom > 0 ? Math.SQRT2 * Math.abs(c2 - c1) / denom : Infinity;
+  return {
+    loN: lo.length, hiN: hi.length,
+    loMean: c1, hiMean: c2,
+    loMedian: quantile(lo, 0.5), hiMedian: quantile(hi, 0.5),
+    minorShare: Math.min(lo.length, hi.length) / v.length,
+    hiShare: hi.length / v.length,
+    D: D,
+    boundary: (c1 + c2) / 2
+  };
+}
+
+/* Standard normal CDF, via the regularized incomplete gamma already above:
+   erf(x) = P(1/2, x^2), so Phi(z) = 0.5 * (1 + P(1/2, z^2/2)). */
+function normCdf(z){
+  if (!isFinite(z)) return z > 0 ? 1 : 0;
+  if (z < 0) return 1 - normCdf(-z);
+  return 0.5 * (1 + lowerRegGamma(0.5, z*z/2));
+}
+
+/* Targeted unit-contamination test. Blind clustering is under-powered when
+   the contaminated share is small, so this tests the specific hypothesis:
+   is there a bump of values sitting a known conversion factor away from the
+   robust core? The core scale uses a one-sided MAD so that contamination in
+   the upper tail cannot inflate the null it is being tested against. */
+function unitMixtureTest(values, factor){
+  var pos = [], i;
+  for (i=0;i<values.length;i++) if (values[i] > 0) pos.push(Math.log(values[i]));
+  if (pos.length < 200 || !(factor > 1.05)) return null;
+  var L = sortNum(pos);
+  var m = quantile(L, 0.5);
+  var dev = [];
+  for (i=0;i<L.length;i++) if (L[i] <= m) dev.push(m - L[i]);
+  var s = 1.4826 * quantile(sortNum(dev), 0.5);
+  if (!(s > 0)) return null;
+  /* A one-sigma window around the shifted centre. Wider windows swallow the
+     core's own upper tail and the test loses power; BAND_MASS corrects the
+     count back to a full-cluster estimate. */
+  var BAND_MASS = 0.6826894921;
+  var lf = Math.log(factor), lo = m + lf - s, hi = m + lf + s;
+  var band = [], core = [];
+  for (i=0;i<L.length;i++){
+    if (L[i] >= lo && L[i] <= hi) band.push(L[i]);
+    if (L[i] < lo) core.push(L[i]);
+  }
+  var pBand = normCdf((hi - m)/s) - normCdf((lo - m)/s);
+  var expct = L.length * pBand;
+  var excess = band.length - expct;
+  var z = expct > 0 ? excess / Math.sqrt(expct) : 0;
+  var est = Math.max(0, excess) / BAND_MASS;
+  var coreMed = core.length ? Math.exp(quantile(sortNum(core), 0.5)) : null;
+  var bandMed = band.length ? Math.exp(quantile(sortNum(band), 0.5)) : null;
+  /* If the factor is smaller than the population's own spread it cannot be
+     told apart from natural variation, and the test must not pretend it can. */
+  var separable = lf >= 2*s;
+  return {
+    n: L.length, factor: factor, separable: separable, sepRatio: lf/s,
+    bandLo: Math.exp(lo), bandHi: Math.exp(hi),
+    obs: band.length, exp: expct, excess: excess, z: z, est: est,
+    ratio: (coreMed && bandMed) ? bandMed/coreMed : null,
+    coreMedian: coreMed, bandMedian: bandMed,
+    share: est / L.length,
+    scale: s, coreMedianLog: m,
+    fires: separable && z >= 5 && expct > 0 && band.length >= 2*expct && est >= 0.02*L.length
+  };
+}
+
+/* ---------------------------------------------------------------
+   2. Field specification. Plausible ranges are survivable-extreme
+      bounds for a recorded observation, not clinical reference ranges.
+   --------------------------------------------------------------- */
+var DISPO_SET = ['01','02','03','04','05','06','07','20','21','30','43','50','51','61','62','63','64','65','66','70'];
+var RACE_SET = ['White','Black or African American','Asian','American Indian or Alaska Native',
+                'Native Hawaiian or Other Pacific Islander','Other','Unknown'];
+var ETH_SET  = ['Hispanic or Latino','Not Hispanic or Latino','Unknown'];
+var SEX_SET  = ['F','M','O','U'];
+var PAYERS   = ['Medicare','Commercial','Medicaid','Self-pay','Other'];
+
+var FIELDS = [
+  {k:'patientId',      kind:'id',   re:/^P[0-9]{6}$/,  reTxt:'^P[0-9]{6}$'},
+  {k:'encounterId',    kind:'id',   re:/^E[0-9]{7}$/,  reTxt:'^E[0-9]{7}$'},
+  {k:'admitDate',      kind:'date'},
+  {k:'dischargeDate',  kind:'date'},
+  {k:'dob',            kind:'date'},
+  {k:'age',            kind:'num',  lo:0,   hi:120,  unit:'yr',   dp:0},
+  {k:'sex',            kind:'cat',  set:SEX_SET,   vague:['U'], qid:true},
+  {k:'race',           kind:'cat',  set:RACE_SET,  vague:['Unknown'], qid:true},
+  {k:'ethnicity',      kind:'cat',  set:ETH_SET,   vague:['Unknown'], qid:true},
+  {k:'zip3',           kind:'code', re:/^[0-9]{3}$/, reTxt:'^[0-9]{3}$', qid:true},
+  {k:'heightCm',       kind:'num',  lo:30,  hi:250,  unit:'cm',   dp:1, factor:2.54,   factorTxt:'inches and centimetres sharing one column'},
+  {k:'weightKg',       kind:'num',  lo:0.5, hi:350,  unit:'kg',   dp:1, factor:2.2046, factorTxt:'pounds recorded in a kilogram column'},
+  {k:'bmi',            kind:'num',  lo:8,   hi:100,  unit:'kg/m²',dp:1},
+  {k:'systolicBP',     kind:'num',  lo:50,  hi:300,  unit:'mmHg', dp:0},
+  {k:'diastolicBP',    kind:'num',  lo:20,  hi:200,  unit:'mmHg', dp:0},
+  {k:'heartRate',      kind:'num',  lo:20,  hi:300,  unit:'bpm',  dp:0},
+  {k:'temperatureC',   kind:'num',  lo:25,  hi:45,   unit:'°C',   dp:1, factor:2.66,   factorTxt:'Fahrenheit values in a Celsius column (37 °C ≈ 98.6 °F)'},
+  {k:'spo2',           kind:'num',  lo:50,  hi:100,  unit:'%',    dp:0},
+  {k:'glucose',        kind:'num',  lo:10,  hi:1500, unit:'mg/dL',dp:0, factor:18.016, factorTxt:'mmol/L and mg/dL glucose sharing one column'},
+  {k:'creatinine',     kind:'num',  lo:0.1, hi:25,   unit:'mg/dL',dp:2, factor:88.4,   factorTxt:'µmol/L and mg/dL creatinine sharing one column'},
+  {k:'hba1c',          kind:'num',  lo:2,   hi:20,   unit:'%',    dp:1},
+  {k:'icd10Primary',   kind:'code', re:/^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/, reTxt:'^[A-Z][0-9]{2}(\\.[0-9A-Z]{1,4})?$'},
+  {k:'cptPrimary',     kind:'code', re:/^[0-9]{5}$/, reTxt:'^[0-9]{5}$'},
+  {k:'dispositionCode',kind:'cat',  set:DISPO_SET},
+  {k:'payerType',      kind:'cat',  set:PAYERS},
+  /* los bounds stay in the range table for reference, but violations are
+     reported once, under temporal plausibility, rather than counted twice. */
+  {k:'los',            kind:'num',  lo:0,   hi:365,  unit:'days', dp:0, rangeInfoOnly:true}
+];
+var FIELD_BY_KEY = {};
+FIELDS.forEach(function(f){ FIELD_BY_KEY[f.k] = f; });
+
+/* Core set used for record-level completeness: the minimum a length-of-stay
+   or readmission model needs before any imputation is even a question. */
+var CORE = ['patientId','encounterId','admitDate','dischargeDate','dob','age','sex',
+            'systolicBP','diastolicBP','heartRate','icd10Primary','payerType','los'];
+
+var ICD10 = ['I10','E11.9','J44.1','N18.30','I50.9','J18.9','A41.9','K57.30','M54.50','R07.9',
+             'Z51.11','S72.001A','E87.6','D62','G40.909','I63.9','O80','Z38.00','K92.2','N39.0'];
+var CPT   = ['99213','99214','99223','99232','99238','93000','71046','80053','85025','36415',
+             '45378','43239','29881','27130','47562','66984','99285','99284','76700','70450'];
+var ZIP3  = ['481','482','483','484','485','486','487','488','489','490','491','492','493','494',
+             '495','496','497','498','499','600','601','602','603','604','605','606','607','608',
+             '432','433','434','435','436','452','453','454','460','461','462','463'];
+
+/* ---------------------------------------------------------------
+   3. Synthetic extract. Every defect below is planted deliberately and
+      counted, so the profiler can be scored against ground truth.
+   --------------------------------------------------------------- */
+var DAY = 86400000;
+var SEED = 20260802;
+var N_REC = 3000;
+var N_PAT = 2050;
+
+function isoDate(ms){ return new Date(ms).toISOString().slice(0,10); }
+function pick(r, arr){ return arr[Math.floor(r() * arr.length) % arr.length]; }
+function pickW(r, arr, w){
+  var tot = 0, i;
+  for (i=0;i<w.length;i++) tot += w[i];
+  var x = r() * tot, acc = 0;
+  for (i=0;i<arr.length;i++){ acc += w[i]; if (x < acc) return arr[i]; }
+  return arr[arr.length-1];
+}
+function shuffled(r, n){
+  var a = new Array(n), i, j, t;
+  for (i=0;i<n;i++) a[i] = i;
+  for (i=n-1;i>0;i--){ j = Math.floor(r()*(i+1)); t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+
+var MCAR = {
+  heightCm:0.08, weightKg:0.06, systolicBP:0.025, diastolicBP:0.025, heartRate:0.02,
+  temperatureC:0.04, spo2:0.03, race:0.05, ethnicity:0.07, zip3:0.02,
+  dispositionCode:0.012, sex:0.004, dob:0.012
+};
+var MCAR_KEYS = ['heightCm','weightKg','systolicBP','diastolicBP','heartRate','temperatureC',
+                 'spo2','race','ethnicity','zip3','dispositionCode','sex','dob'];
+/* Labs are ordered, not observed. Ordering tracks coverage, so the gap is
+   structured by payer — the dangerous kind of missingness. */
+var LAB_MISS = {
+  glucose:    {'Medicare':0.22,'Commercial':0.19,'Medicaid':0.28,'Self-pay':0.74,'Other':0.25},
+  creatinine: {'Medicare':0.20,'Commercial':0.18,'Medicaid':0.26,'Self-pay':0.71,'Other':0.24},
+  hba1c:      {'Medicare':0.58,'Commercial':0.55,'Medicaid':0.62,'Self-pay':0.93,'Other':0.60}
+};
+
+function buildExtract(seed){
+  var r = mulberry32(seed), nrm = makeNormal(r), i, j;
+  var t0 = Date.UTC(2024,0,1), SPAN = 366;
+
+  /* --- patient dimension --- */
+  var raceDraw = ['White','Black or African American','Asian','American Indian or Alaska Native','Other','Unknown'];
+  var raceW    = [0.600, 0.142, 0.062, 0.014, 0.052, 0.130];
+  var patients = [];
+  for (i=0;i<N_PAT;i++){
+    var sex = pickW(r, SEX_SET, [0.520,0.470,0.006,0.004]);
+    var ageY = Math.round(clamp(nrm(57,21), 0, 97));
+    var hMu = sex === 'F' ? 162 : (sex === 'M' ? 176 : 169);
+    var hSd = sex === 'O' || sex === 'U' ? 8.5 : (sex === 'F' ? 6.8 : 7.4);
+    patients.push({
+      id: 'P' + (100000 + i),
+      sex: sex,
+      dobMs: t0 - Math.floor(ageY*365.25 + r()*365) * DAY,
+      race: pickW(r, raceDraw, raceW),
+      ethnicity: pickW(r, ETH_SET, [0.18,0.74,0.08]),
+      zip3: pick(r, ZIP3),
+      heightCm: r1(clamp(nrm(hMu,hSd), 132, 205))
+    });
+  }
+  /* Guaranteed tiny cells: a rare race category and a rare ZIP3.
+     Both are legitimate values; both are a modelling and re-identification risk. */
+  var rareIdx = shuffled(r, N_PAT);
+  for (i=0;i<5;i++)  patients[rareIdx[i]].race = 'Native Hawaiian or Other Pacific Islander';
+  for (i=5;i<8;i++)  patients[rareIdx[i]].zip3 = '999';
+
+  /* --- encounters --- */
+  var assign = shuffled(r, N_PAT);
+  var patOf = new Array(N_REC);
+  for (i=0;i<N_REC;i++) patOf[i] = i < N_PAT ? assign[i] : Math.floor(r()*N_PAT);
+  var order = shuffled(r, N_REC);
+  var patOf2 = new Array(N_REC);
+  for (i=0;i<N_REC;i++) patOf2[i] = patOf[order[i]];
+
+  var recs = [], heaped = 0;
+  for (i=0;i<N_REC;i++){
+    var p = patients[patOf2[i]];
+    var admit = t0 + Math.floor(r()*SPAN) * DAY;
+    if (r() < 0.12){                       /* date heaping on the 1st */
+      var d = new Date(admit);
+      admit = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+      heaped++;
+    }
+    var los = Math.min(45, Math.max(0, Math.round(Math.exp(nrm(Math.log(3.0), 0.85)) - 1)));
+    var bmiTrue = clamp(Math.exp(nrm(Math.log(27.5), 0.22)), 13, 62);
+    var hM = p.heightCm / 100;
+    var wt = r1(bmiTrue * hM * hM);
+    var sbp = Math.round(clamp(nrm(131,20), 70, 230));
+    recs.push({
+      patientId: p.id,
+      encounterId: 'E' + (1000000 + i),
+      admitDate: isoDate(admit),
+      dischargeDate: isoDate(admit + los*DAY),
+      dob: isoDate(p.dobMs),
+      age: Math.floor((admit - p.dobMs) / (365.25*DAY)),
+      sex: p.sex,
+      race: p.race,
+      ethnicity: p.ethnicity,
+      zip3: p.zip3,
+      heightCm: p.heightCm,
+      weightKg: wt,
+      bmi: r1(wt / (hM*hM)),
+      systolicBP: sbp,
+      diastolicBP: Math.round(clamp(0.42*sbp + nrm(21, 9), 40, 130)),  /* correlated, as real pairs are */
+      heartRate: Math.round(clamp(nrm(84,16), 38, 170)),
+      temperatureC: r1(clamp(nrm(36.9,0.55), 34.5, 41)),
+      spo2: Math.round(clamp(nrm(96.5,2.2), 70, 100)),
+      glucose: Math.round(clamp(Math.exp(nrm(Math.log(112), 0.34)), 40, 900)),
+      creatinine: r2(clamp(Math.exp(nrm(0, 0.42)), 0.3, 12)),
+      hba1c: r1(clamp(nrm(6.4,1.4), 3.8, 15)),
+      icd10Primary: pick(r, ICD10),
+      cptPrimary: pick(r, CPT),
+      dispositionCode: pickW(r, DISPO_SET,
+        [0.600,0.020,0.090,0.006,0.004,0.120,0.020,0.025,0.004,0.006,
+         0.004,0.010,0.015,0.008,0.040,0.006,0.006,0.004,0.004,0.008]),
+      payerType: pickW(r, PAYERS, [0.38,0.30,0.18,0.09,0.05]),
+      los: los,
+      _admitMs: admit
+    });
+  }
+
+  /* --- missingness --- */
+  for (i=0;i<N_REC;i++){
+    var rec = recs[i];
+    for (j=0;j<MCAR_KEYS.length;j++){
+      if (r() < MCAR[MCAR_KEYS[j]]) rec[MCAR_KEYS[j]] = null;
+    }
+    if (r() < LAB_MISS.glucose[rec.payerType])    rec.glucose = null;
+    if (r() < LAB_MISS.creatinine[rec.payerType]) rec.creatinine = null;
+    if (r() < LAB_MISS.hba1c[rec.payerType])      rec.hba1c = null;
+    /* BMI cannot exist without its inputs, plus an independent gap. */
+    if (rec.heightCm === null || rec.weightKg === null || r() < 0.03) rec.bmi = null;
+  }
+
+  /* --- planted row-level defects, on disjoint rows --- */
+  var pool = shuffled(r, N_REC), c = 0;
+  function take(n){ var s = pool.slice(c, c+n); c += n; return s; }
+  var reserved = {};
+  var truth = {};
+
+  var gA = take(18);  gA.forEach(function(ix){                       /* discharge before admit */
+    var k = 1 + Math.floor(r()*5), rec = recs[ix];
+    rec.dischargeDate = isoDate(rec._admitMs - k*DAY);
+    rec.los = -k;
+  });
+  truth.dischargeBeforeAdmit = gA.length;
+
+  var gB = take(10);  gB.forEach(function(ix){                       /* negative LOS, dates intact */
+    recs[ix].los = -(1 + Math.floor(r()*4));
+  });
+  truth.negativeLosOnly = gB.length;
+
+  var gC = take(9);   gC.forEach(function(ix){                       /* birth after admit */
+    recs[ix].dob = isoDate(recs[ix]._admitMs + (30 + Math.floor(r()*470))*DAY);
+  });
+  truth.dobAfterAdmit = gC.length;
+
+  var gD = take(46), bmiSlips = 0;                                   /* BMI transcription slip */
+  gD.forEach(function(ix){
+    var rec = recs[ix];
+    if (rec.heightCm === null || rec.weightKg === null) return;      /* nothing to contradict */
+    if (rec.bmi === null) rec.bmi = r1(rec.weightKg / Math.pow(rec.heightCm/100, 2));
+    rec.bmi = r1(rec.bmi + (rec.bmi < 20 || r() < 0.5 ? 6.5 : -5.5));
+    bmiSlips++;
+  });
+  truth.bmiSlip = bmiSlips;
+
+  /* Each of these must genuinely fail ^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$ —
+     a "bad" code that quietly satisfies the pattern would silently weaken
+     the ground truth this page is scored against. */
+  var badIcd = ['R0602','I10.','Z5189','E11.9A2XY','250.00','J96.0.1','UNKNOWN','N18-30'];
+  var gE = take(38);  gE.forEach(function(ix){ recs[ix].icd10Primary = pick(r, badIcd); });
+  truth.badIcd10 = gE.length;
+
+  var badCpt = ['9921','992130','99213A','0Q123','  99213'];
+  var gF = take(27);  gF.forEach(function(ix){ recs[ix].cptPrimary = pick(r, badCpt); });
+  truth.badCpt = gF.length;
+
+  var badDispo = ['99','XX','7A','00','1'];
+  var gG = take(22);  gG.forEach(function(ix){ recs[ix].dispositionCode = pick(r, badDispo); });
+  truth.badDispo = gG.length;
+
+  var gH = take(14);  gH.forEach(function(ix){ recs[ix].heartRate = pick(r, [380,400,420]); });
+  truth.hrImpossible = gH.length;
+  var gI = take(11);  gI.forEach(function(ix){ recs[ix].temperatureC = pick(r, [12.0, 9.8, 14.4]); });
+  truth.tempImpossible = gI.length;
+  var gJ = take(9);   gJ.forEach(function(ix){ recs[ix].spo2 = pick(r, [130, 145, 111]); });
+  truth.spo2Impossible = gJ.length;
+  var gK = take(7);   gK.forEach(function(ix){ recs[ix].systolicBP = pick(r, [380,400,420]); });
+  truth.sbpImpossible = gK.length;
+  var gL = take(5);   gL.forEach(function(ix){ recs[ix].glucose = 5000; });
+  truth.glucoseImpossible = gL.length;
+  var gM = take(4);   gM.forEach(function(ix){ recs[ix].creatinine = 88; });
+  truth.creatImpossible = gM.length;
+
+  var gN = take(15);  gN.forEach(function(ix){                       /* diastolic above systolic */
+    var rec = recs[ix];
+    if (rec.systolicBP === null || rec.systolicBP > 180) rec.systolicBP = 172;
+    rec.diastolicBP = rec.systolicBP + 2 + Math.floor(r()*8);
+  });
+  truth.sbpLeDbp = gN.length;
+
+  var gO = take(24), usedDonor = {};                                 /* duplicate encounter keys */
+  gO.forEach(function(ix){ reserved[ix] = 1; });
+  gO.forEach(function(ix){
+    var d = (ix * 13 + 5) % N_REC, guard = 0;
+    while ((usedDonor[d] || reserved[d] || d === ix) && guard < N_REC){ d = (d + 1) % N_REC; guard++; }
+    usedDonor[d] = 1;
+    recs[ix].encounterId = recs[d].encounterId;
+  });
+  truth.dupEncounterId = gO.length;
+
+  var gP = take(19);  gP.forEach(function(ix, n){                    /* orphan foreign key */
+    recs[ix].patientId = 'P' + (900000 + n);
+  });
+  truth.orphanPatient = gP.length;
+
+  var gQ = take(16), clones = [];                                    /* near-duplicate patients */
+  gQ.forEach(function(ix, n){
+    var rec = recs[ix];
+    var src = null;
+    for (j=0;j<patients.length;j++){ if (patients[j].id === rec.patientId){ src = patients[j]; break; } }
+    if (!src) return;
+    var shift = (r() < 0.5 ? -1 : 1) * DAY;
+    var clone = {
+      id: 'P' + (200000 + n), sex: src.sex, dobMs: src.dobMs + shift,
+      race: src.race, ethnicity: src.ethnicity, zip3: src.zip3,
+      heightCm: r1(src.heightCm + (r() < 0.5 ? -0.4 : 0.4))
+    };
+    clones.push(clone);
+    rec.patientId = clone.id;
+    rec.dob = isoDate(clone.dobMs);
+    rec.zip3 = clone.zip3;
+    rec.sex = clone.sex;
+  });
+  truth.nearDupPatients = clones.length;
+  for (i=0;i<c;i++) reserved[pool[i]] = 1;
+
+  /* --- unit contamination: an interface change in one quarter --- */
+  var w0 = Date.UTC(2024,7,1), w1 = Date.UTC(2024,10,1), lb = 0;
+  for (i=0;i<N_REC;i++){
+    if (reserved[i]) continue;
+    var rc = recs[i];
+    if (rc.weightKg === null) continue;
+    if (rc._admitMs >= w0 && rc._admitMs < w1 && r() < 0.42){
+      rc.weightKg = r1(rc.weightKg * 2.20462);   /* BMI keeps its correct value */
+      lb++;
+      truth._lbRows = truth._lbRows || {};
+      truth._lbRows[i] = 1;
+    }
+  }
+  truth.poundsRows = lb;
+  truth.heaped = heaped;
+
+  for (i=0;i<N_REC;i++) delete recs[i]._admitMs;
+  var roster = {};
+  patients.concat(clones).forEach(function(p){ roster[p.id] = p; });
+  return {records: recs, roster: roster, rosterN: N_PAT + clones.length, truth: truth, seed: seed};
+}
+
+/* ---------------------------------------------------------------
+   4. The checks. Kahn dimensions: completeness, conformance,
+      plausibility. Distributional is an addition, labelled as one.
+   --------------------------------------------------------------- */
+function isMissing(v){ return v === null || v === undefined || v === '' || (typeof v === 'number' && !isFinite(v)); }
+function parseISO(s){
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  var ms = Date.parse(s + 'T00:00:00Z');
+  if (!isFinite(ms)) return null;
+  if (isoDate(ms) !== s) return null;      /* rejects 2024-02-31 and friends */
+  return ms;
+}
+function setCount(o){ return Object.keys(o).length; }
+function rate(num, den){ return den > 0 ? num / den : null; }
+
+function chiSqMissing(recs, key){
+  var obs = {}, tot = {}, miss = 0, n = 0;
+  PAYERS.forEach(function(l){ obs[l] = 0; tot[l] = 0; });
+  recs.forEach(function(rec){
+    var p = rec.payerType;
+    if (isMissing(p) || tot[p] === undefined) return;
+    tot[p]++; n++;
+    if (isMissing(rec[key])){ obs[p]++; miss++; }
+  });
+  if (!n || miss === 0 || miss === n) return null;
+  var pm = miss / n, chi2 = 0, minExp = Infinity, used = 0, rates = {};
+  PAYERS.forEach(function(l){
+    if (!tot[l]) return;
+    used++;
+    var e1 = tot[l] * pm, e0 = tot[l] * (1 - pm);
+    minExp = Math.min(minExp, e1, e0);
+    chi2 += Math.pow(obs[l] - e1, 2) / e1 + Math.pow((tot[l] - obs[l]) - e0, 2) / e0;
+    rates[l] = obs[l] / tot[l];
+  });
+  var df = used - 1;
+  /* 2 x k table, so min(rows-1, cols-1) = 1 and Cramer's V = sqrt(chi2/n). */
+  var V = n > 0 ? Math.sqrt(chi2 / n) : 0;
+  var best = null, worst = null;
+  Object.keys(rates).forEach(function(l){
+    if (worst === null || rates[l] > rates[worst]) worst = l;
+    if (best === null || rates[l] < rates[best]) best = l;
+  });
+  return {chi2:chi2, df:df, p:chiSqUpperP(chi2, df), V:V, minExp:minExp,
+          rates:rates, tot:tot, obs:obs, overall:pm, n:n, worst:worst, best:best};
+}
+
+function dayHeaping(recs){
+  var counts = [], i;
+  for (i=0;i<32;i++) counts.push(0);
+  var n = 0, minMs = Infinity, maxMs = -Infinity;
+  recs.forEach(function(rec){
+    var ms = parseISO(rec.admitDate);
+    if (ms === null) return;
+    n++; counts[new Date(ms).getUTCDate()]++;
+    if (ms < minMs) minMs = ms;
+    if (ms > maxMs) maxMs = ms;
+  });
+  if (n < 62 || !isFinite(minMs)) return null;
+  var exp = [], days = 0;
+  for (i=0;i<32;i++) exp.push(0);
+  for (var t = minMs; t <= maxMs; t += DAY){ exp[new Date(t).getUTCDate()]++; days++; }
+  if (!days) return null;
+  var chi2 = 0, cells = 0, minExp = Infinity;
+  for (var d = 1; d <= 31; d++){
+    if (exp[d] <= 0) continue;
+    var e = n * exp[d] / days;
+    cells++; minExp = Math.min(minExp, e);
+    chi2 += Math.pow(counts[d] - e, 2) / e;
+  }
+  var e1 = n * exp[1] / days;
+  return {n:n, day1:counts[1], day1Share:counts[1]/n, expShare:exp[1]/days,
+          chi2:chi2, df:Math.max(1, cells-1), p:chiSqUpperP(chi2, Math.max(1, cells-1)),
+          z:e1 > 0 ? (counts[1] - e1)/Math.sqrt(e1) : 0, minExp:minExp, counts:counts};
+}
+
+function duplicateKeys(recs){
+  var m = {}, keys = 0, rows = 0, distinct = 0;
+  recs.forEach(function(rec){
+    if (isMissing(rec.encounterId)) return;
+    m[rec.encounterId] = (m[rec.encounterId] || 0) + 1;
+  });
+  Object.keys(m).forEach(function(k){ distinct++; if (m[k] > 1){ keys++; rows += m[k]; } });
+  return {keys:keys, rows:rows, distinct:distinct};
+}
+
+function nearDuplicatePatients(recs){
+  var pat = {}, order = [];
+  recs.forEach(function(rec){
+    var id = rec.patientId;
+    if (isMissing(id)) return;
+    if (!pat[id]){ pat[id] = {id:id, dob:null, sex:null, zip3:null}; order.push(id); }
+    var o = pat[id];
+    if (o.dob === null && !isMissing(rec.dob)) o.dob = rec.dob;
+    if (o.sex === null && !isMissing(rec.sex)) o.sex = rec.sex;
+    if (o.zip3 === null && !isMissing(rec.zip3)) o.zip3 = rec.zip3;
+  });
+  var blocks = {}, i, j;
+  order.forEach(function(id){
+    var o = pat[id];
+    if (o.dob === null) return;
+    var key = (o.sex || 'NA') + '|' + (o.zip3 || 'NA');
+    if (!blocks[key]) blocks[key] = [];
+    blocks[key].push(o);
+  });
+  var pairs = [], comparisons = 0;
+  Object.keys(blocks).forEach(function(bk){
+    var b = blocks[bk];
+    for (i=0;i<b.length;i++){
+      for (j=i+1;j<b.length;j++){
+        comparisons++;
+        var a = parseISO(b[i].dob), c = parseISO(b[j].dob);
+        if (a === null || c === null) continue;
+        if (Math.abs(a - c) <= 2*DAY) pairs.push([b[i].id, b[j].id, Math.round(Math.abs(a-c)/DAY)]);
+      }
+    }
+  });
+  return {patients: order.length, pairs: pairs, comparisons: comparisons, blocks: Object.keys(blocks).length};
+}
+
+function numericSummary(vals){
+  var s = sortNum(vals), out = {n:s.length};
+  out.min = s.length ? s[0] : null;
+  out.max = s.length ? s[s.length-1] : null;
+  out.q1 = quantile(s, 0.25); out.med = quantile(s, 0.5); out.q3 = quantile(s, 0.75);
+  out.p01 = quantile(s, 0.01); out.p99 = quantile(s, 0.99);
+  out.iqr = (out.q1 === null || out.q3 === null) ? null : out.q3 - out.q1;
+  if (out.iqr !== null && out.iqr > 0){
+    out.loFence = out.q1 - 1.5*out.iqr;
+    out.hiFence = out.q3 + 1.5*out.iqr;
+    var b = 0;
+    for (var i=0;i<s.length;i++) if (s[i] < out.loFence || s[i] > out.hiFence) b++;
+    out.beyond = b; out.beyondRate = s.length ? b/s.length : null;
+  } else {
+    out.loFence = null; out.hiFence = null; out.beyond = null; out.beyondRate = null;
+  }
+  out.sorted = s;
+  return out;
+}
+
+function categoryCounts(recs, key){
+  var m = {}, order = [], n = 0;
+  recs.forEach(function(rec){
+    var v = rec[key];
+    if (isMissing(v)) return;
+    if (m[v] === undefined){ m[v] = 0; order.push(v); }
+    m[v]++; n++;
+  });
+  order.sort(function(a,b){ return m[b] - m[a]; });
+  return {counts:m, order:order, n:n};
+}
+
+function profile(ex){
+  var recs = ex.records, N = recs.length, i, j, f;
+  var res = {n:N, seed:ex.seed, truth:ex.truth, rosterN:ex.rosterN,
+             fields:{}, findings:[], ds:{}};
+
+  /* ---- row-level derived violations (temporal + cross-field) ---- */
+  var vio = {dischargeBeforeAdmit:{}, dobAfterAdmit:{}, negLos:{}, losMismatch:{}, ageDobMismatch:{}, sbpLeDbp:{}};
+  var tempDen = 0, losDen = 0, ageDen = 0, bpDen = 0;
+  for (i=0;i<N;i++){
+    var rec = recs[i];
+    var a = parseISO(rec.admitDate), d = parseISO(rec.dischargeDate), b = parseISO(rec.dob);
+    if (a !== null && d !== null){ tempDen++; if (d < a) vio.dischargeBeforeAdmit[i] = 1; }
+    if (a !== null && b !== null && b > a) vio.dobAfterAdmit[i] = 1;
+    if (!isMissing(rec.los)){
+      losDen++;
+      if (rec.los < 0) vio.negLos[i] = 1;
+      if (a !== null && d !== null && Math.round((d - a)/DAY) !== rec.los) vio.losMismatch[i] = 1;
+    }
+    if (!isMissing(rec.age) && a !== null && b !== null){
+      ageDen++;
+      var recomputed = Math.floor((a - b) / (365.25*DAY));
+      if (Math.abs(recomputed - rec.age) > 1) vio.ageDobMismatch[i] = 1;
+    }
+    if (!isMissing(rec.systolicBP) && !isMissing(rec.diastolicBP)){
+      bpDen++;
+      if (rec.systolicBP <= rec.diastolicBP) vio.sbpLeDbp[i] = 1;
+    }
+  }
+  res.ds.temporal = {tempDen:tempDen, losDen:losDen, ageDen:ageDen, bpDen:bpDen, vio:vio};
+
+  /* ---- per-field completeness, conformance, atemporal plausibility ---- */
+  for (j=0;j<FIELDS.length;j++){
+    f = FIELDS[j];
+    var fs = {k:f.k, kind:f.kind, spec:f, missing:0, vague:0, present:0,
+              valueFail:{}, relFail:{}, compFail:{}, compDen:0, plaus:{}, plausDen:0,
+              vals:[], cats:null};
+    for (i=0;i<N;i++){
+      var v = recs[i][f.k];
+      if (isMissing(v)){ fs.missing++; continue; }
+      fs.present++;
+      if (f.vague && f.vague.indexOf(v) >= 0) fs.vague++;
+      /* value conformance */
+      if (f.kind === 'id' || f.kind === 'code'){
+        if (typeof v !== 'string' || !f.re.test(v)) fs.valueFail[i] = 1;
+      } else if (f.kind === 'cat'){
+        if (f.set.indexOf(v) < 0) fs.valueFail[i] = 1;
+      } else if (f.kind === 'date'){
+        if (parseISO(v) === null) fs.valueFail[i] = 1;
+      } else if (f.kind === 'num'){
+        if (typeof v !== 'number' || !isFinite(v)) fs.valueFail[i] = 1;
+        else fs.vals.push(v);
+      }
+      /* atemporal plausibility */
+      if (f.kind === 'num' && typeof v === 'number' && isFinite(v)){
+        fs.plausDen++;
+        if (v < f.lo || v > f.hi) fs.plaus[i] = 1;
+      }
+    }
+    fs.missingRate = rate(fs.missing, N);
+    fs.vagueRate = rate(fs.vague, N);
+    fs.effMissingRate = rate(fs.missing + fs.vague, N);
+    res.fields[f.k] = fs;
+  }
+
+  /* relational conformance: encounter -> patient dimension */
+  var fsPat = res.fields.patientId;
+  for (i=0;i<N;i++){
+    var pid = recs[i].patientId;
+    if (isMissing(pid)) continue;
+    if (!ex.roster[pid]) fsPat.relFail[i] = 1;
+  }
+  /* computational conformance: BMI from its own inputs */
+  var fsBmi = res.fields.bmi, BMI_TOL = 1.0;
+  for (i=0;i<N;i++){
+    var rc = recs[i];
+    if (isMissing(rc.bmi) || isMissing(rc.heightCm) || isMissing(rc.weightKg)) continue;
+    if (rc.heightCm <= 0) continue;
+    fsBmi.compDen++;
+    var hm = rc.heightCm / 100;
+    if (Math.abs(rc.bmi - rc.weightKg/(hm*hm)) > BMI_TOL) fsBmi.compFail[i] = 1;
+  }
+  res.ds.bmiTol = BMI_TOL;
+
+  /* temporal + cross-field attribution onto the fields they implicate */
+  function addPlaus(key, obj){ var o = res.fields[key].plaus; Object.keys(obj).forEach(function(ix){ o[ix] = 1; }); }
+  addPlaus('dischargeDate', vio.dischargeBeforeAdmit);
+  addPlaus('dob', vio.dobAfterAdmit);
+  addPlaus('los', vio.negLos); addPlaus('los', vio.losMismatch);
+  addPlaus('age', vio.ageDobMismatch);
+  addPlaus('systolicBP', vio.sbpLeDbp); addPlaus('diastolicBP', vio.sbpLeDbp);
+  res.fields.dischargeDate.plausDen = tempDen;
+  res.fields.dob.plausDen = res.fields.dob.present;
+  res.fields.los.plausDen = losDen;
+  res.fields.age.plausDen = Math.max(res.fields.age.plausDen, ageDen);
+
+  /* uniqueness plausibility attaches to the key fields */
+  res.ds.dups = duplicateKeys(recs);
+  res.ds.nearDup = nearDuplicatePatients(recs);
+
+  /* finalise per-field rates */
+  FIELDS.forEach(function(fd){
+    var s = res.fields[fd.k];
+    var conf = {};
+    Object.keys(s.valueFail).forEach(function(ix){ conf[ix] = 1; });
+    Object.keys(s.relFail).forEach(function(ix){ conf[ix] = 1; });
+    Object.keys(s.compFail).forEach(function(ix){ conf[ix] = 1; });
+    s.confRows = conf;
+    s.confDen = s.present;
+    s.confFail = setCount(conf);
+    s.confRate = rate(s.confFail, s.confDen);
+    s.plausFail = setCount(s.plaus);
+    s.plausRate = rate(s.plausFail, s.plausDen);
+    s.valueFailN = setCount(s.valueFail);
+    s.relFailN = setCount(s.relFail);
+    s.compFailN = setCount(s.compFail);
+    if (fd.kind === 'cat') s.cats = categoryCounts(recs, fd.k);
+    s.chi = (s.missing > 0 && s.missing < N && fd.k !== 'payerType') ? chiSqMissing(recs, fd.k) : null;
+  });
+
+  /* ---- record-level completeness ---- */
+  var complete = 0, coreSum = 0, allSum = 0;
+  for (i=0;i<N;i++){
+    var have = 0;
+    for (j=0;j<CORE.length;j++) if (!isMissing(recs[i][CORE[j]])) have++;
+    if (have === CORE.length) complete++;
+    coreSum += have / CORE.length;
+    var haveAll = 0;
+    for (j=0;j<FIELDS.length;j++) if (!isMissing(recs[i][FIELDS[j].k])) haveAll++;
+    allSum += haveAll / FIELDS.length;
+  }
+  res.ds.recordComplete = {full:complete, fullRate:rate(complete, N),
+                           coreMean:N ? coreSum/N : null, allMean:N ? allSum/N : null,
+                           coreN:CORE.length};
+
+  /* ---- distributional: run on in-range values only ---- */
+  res.ds.numeric = {};
+  FIELDS.forEach(function(fd){
+    if (fd.kind !== 'num') return;
+    var s = res.fields[fd.k];
+    var inRange = [], all = [];
+    for (i=0;i<N;i++){
+      var v = recs[i][fd.k];
+      if (isMissing(v) || typeof v !== 'number') continue;
+      all.push(v);
+      if (v >= fd.lo && v <= fd.hi) inRange.push(v);
+    }
+    var sum = numericSummary(all);
+    var tm = null, logTm = null;
+    if (inRange.length >= 100 && sum.min !== null){
+      var pos = inRange.filter(function(v){ return v > 0; });
+      if (pos.length >= 100){
+        logTm = twoMeans(pos.map(function(v){ return Math.log(v); }));
+        if (logTm){
+          logTm.loMedian = Math.exp(logTm.loMedian);
+          logTm.hiMedian = Math.exp(logTm.hiMedian);
+          logTm.boundaryValue = Math.exp(logTm.boundary);
+          logTm.ratio = logTm.loMedian > 0 ? logTm.hiMedian / logTm.loMedian : null;
+        }
+      }
+      tm = logTm;
+    }
+    var um = fd.factor ? unitMixtureTest(inRange, fd.factor) : null;
+    res.ds.numeric[fd.k] = {sum:sum, inRangeN:inRange.length, tm:tm, um:um};
+  });
+
+  res.ds.heap = dayHeaping(recs);
+  res.ds.payerCounts = categoryCounts(recs, 'payerType');
+  return res;
+}
+
+/* ---------------------------------------------------------------
+   5. Findings. Severity is derived from the measured rate; the
+      arithmetic is carried on the finding so it can be argued with.
+   --------------------------------------------------------------- */
+function pctTxt(x, dp){ return (x === null || x === undefined || !isFinite(x)) ? '—' : (x*100).toFixed(dp === undefined ? 1 : dp) + '%'; }
+function numTxt(x, dp){ return (x === null || x === undefined || !isFinite(x)) ? '—' : Number(x).toFixed(dp === undefined ? 1 : dp); }
+function intTxt(x){ return (x === null || x === undefined || !isFinite(x)) ? '—' : String(Math.round(x)); }
+function pTxt(p){
+  if (p === null || p === undefined || !isFinite(p)) return 'p —';
+  if (p < 1e-12) return 'p < 1e-12';
+  if (p < 0.001) return 'p = ' + p.toExponential(1);
+  return 'p = ' + p.toFixed(4);
+}
+function sevCalc(base, k, x, xtxt){
+  var raw = base + k*x;
+  var v = Math.round(Math.min(100, Math.max(0, raw)));
+  var txt = 'severity = ' + base + ' + ' + k + ' × ' + xtxt + ' = ' + numTxt(raw, 1) + (raw > 100 ? ', capped at 100' : '');
+  return {sev:v, calc:txt};
+}
+
+var DERIVED_CHECK = {
+  weightKg: {
+    needs: 'heightCm',
+    label: 'an implied BMI above 50 kg/m²',
+    test: function(rec){
+      if (isMissing(rec.heightCm) || rec.heightCm <= 0) return null;
+      var hm = rec.heightCm/100;
+      return rec.weightKg/(hm*hm) > 50;
+    }
+  }
+};
+
+function corroborate(ex, key, boundary){
+  var recs = ex.records, up = {n:0, bad:0}, lo = {n:0, bad:0};
+  var months = {}, upMonths = 0, dc = DERIVED_CHECK[key] || null;
+  recs.forEach(function(rec){
+    var v = rec[key];
+    if (isMissing(v) || typeof v !== 'number') return;
+    var side = v >= boundary ? up : lo;
+    if (dc){
+      var t = dc.test(rec);
+      if (t !== null){ side.n++; if (t) side.bad++; }
+    }
+    if (v >= boundary && !isMissing(rec.admitDate) && rec.admitDate.length >= 7){
+      var m = rec.admitDate.slice(0,7);
+      months[m] = (months[m] || 0) + 1; upMonths++;
+    }
+  });
+  var mk = Object.keys(months).sort(function(a,b){ return months[b] - months[a]; });
+  var top3 = mk.slice(0,3), topSum = 0;
+  top3.forEach(function(m){ topSum += months[m]; });
+  return {
+    up:up, lo:lo,
+    upRate: rate(up.bad, up.n), loRate: rate(lo.bad, lo.n),
+    label: dc ? dc.label : null,
+    topMonths: top3, topShare: rate(topSum, upMonths), upMonths: upMonths,
+    monthsSeen: mk.length
+  };
+}
+
+function buildFindings(res, ex){
+  var F = [], N = res.n;
+  function add(o){ F.push(o); return o; }
+  var fld = function(k){ return res.fields[k]; };
+
+  /* ---------- COMPLETENESS ---------- */
+  FIELDS.forEach(function(f){
+    var s = fld(f.k);
+    if (s.missingRate !== null && s.missingRate >= 0.05){
+      var c = sevCalc(0, 250, s.missingRate, numTxt(s.missingRate, 3));
+      add({id:'C-01', dim:'Completeness', check:'Field completeness', field:f.k, sev:c.sev, calc:c.calc,
+        title: f.k + ' is absent from ' + pctTxt(s.missingRate) + ' of encounters',
+        ev:[intTxt(s.missing) + ' of ' + intTxt(N) + ' rows carry no value.'],
+        action: s.missingRate >= 0.3 ? 'EXCLUDE' : 'REPAIR',
+        rx: s.missingRate >= 0.3
+          ? 'Do not impute at this rate — imputation would invent more of the column than it repairs. Either source the field from the originating system or drop it from the feature set and record the decision.'
+          : 'Quantify whether the gap is random (see C-02). If it is, mean or model-based imputation with a missing-indicator is defensible; document the choice in the model card.',
+        exec: f.k + ' is missing for ' + pctTxt(s.missingRate) + ' of encounters. ' +
+              (s.missingRate >= 0.3
+                ? 'At that rate the column is mostly reconstruction, not measurement.'
+                : 'Usable, but only with an explicit imputation decision on the record.')});
+    }
+    if (s.vagueRate !== null && s.vagueRate >= 0.03){
+      var c2 = sevCalc(25, 150, s.vagueRate, numTxt(s.vagueRate, 3));
+      add({id:'C-01b', dim:'Completeness', check:'Disguised missingness', field:f.k, sev:c2.sev, calc:c2.calc,
+        title: f.k + ' carries a conformant but empty code in ' + pctTxt(s.vagueRate) + ' of rows',
+        ev:['"' + f.vague.join('", "') + '" passes the value set but carries no information.',
+            'Nominal completeness ' + pctTxt(1 - s.missingRate) + '; effective completeness ' + pctTxt(1 - s.effMissingRate) + '.'],
+        action:'INVESTIGATE',
+        rx:'Treat these codes as missing in every completeness report and in any fairness analysis. A stratified metric computed over a category that is one-fifth "Unknown" is not a stratified metric.',
+        exec: f.k + ' looks ' + pctTxt(1 - s.missingRate) + ' complete but is only ' + pctTxt(1 - s.effMissingRate) +
+              ' informative once "' + f.vague.join('/') + '" is counted as absent. Any equity analysis cut on this field inherits that gap.'});
+    }
+    var ch = s.chi;
+    if (ch && ch.minExp >= 5 && ch.p < 0.01 && ch.V >= 0.06){
+      var c3 = sevCalc(25, 150, ch.V, numTxt(ch.V, 3));
+      add({id:'C-02', dim:'Completeness', check:'Missingness dependence on payerType', field:f.k, sev:c3.sev, calc:c3.calc,
+        title: f.k + ' is not missing at random — the gap tracks payer',
+        ev:['Pearson chi-square = ' + numTxt(ch.chi2, 1) + ' on ' + intTxt(ch.df) + ' df, ' + pTxt(ch.p) + ', Cramér’s V = ' + numTxt(ch.V, 3) + '.',
+            'Missing ' + pctTxt(ch.rates[ch.worst]) + ' for ' + ch.worst + ' versus ' + pctTxt(ch.rates[ch.best]) + ' for ' + ch.best + '.',
+            'Smallest expected cell ' + numTxt(ch.minExp, 1) + ', so the chi-square approximation holds.'],
+        action:'EXCLUDE',
+        rx:'Either drop the field or keep it only alongside an explicit "not measured" indicator — then test whether the model leans on that indicator. Report performance separately by payer before any deployment decision.',
+        exec: f.k + ' is missing ' + pctTxt(ch.rates[ch.worst]) + ' of the time for ' + ch.worst + ' encounters against ' +
+              pctTxt(ch.rates[ch.best]) + ' for ' + ch.best + '. A model trained on this learns who got tested, not who was sick, and it will underperform for exactly the group with the least coverage.'});
+    }
+  });
+  var rcp = res.ds.recordComplete;
+  if (rcp && rcp.fullRate !== null){
+    var c4 = sevCalc(0, 120, 1 - rcp.fullRate, numTxt(1 - rcp.fullRate, 3));
+    add({id:'C-03', dim:'Completeness', check:'Record-level completeness', field:null, sev:c4.sev, calc:c4.calc,
+      title: pctTxt(1 - rcp.fullRate) + ' of encounters are incomplete on the ' + rcp.coreN + ' core modelling fields',
+      ev:[intTxt(rcp.full) + ' of ' + intTxt(N) + ' rows are complete on every core field.',
+          'Mean core completeness ' + pctTxt(rcp.coreMean) + '; mean completeness across all ' + FIELDS.length + ' fields ' + pctTxt(rcp.allMean) + '.',
+          'Core set: ' + CORE.join(', ') + '.'],
+      action:'REPAIR',
+      rx:'Decide before training whether incomplete rows are dropped or imputed. A complete-case analysis at this rate is affordable; make it an explicit, recorded choice rather than a default of the tooling.',
+      exec:'Roughly ' + pctTxt(1 - rcp.fullRate, 0) + ' of encounters are missing at least one core field. That is a manageable loss if handled deliberately.'});
+  }
+
+  /* ---------- CONFORMANCE ---------- */
+  FIELDS.forEach(function(f){
+    var s = fld(f.k);
+    if (s.valueFailN > 0 && s.present > 0){
+      var rt = s.valueFailN / s.present;
+      var c = sevCalc(35, 1500, rt, numTxt(rt, 4));
+      var expect = f.re ? 'pattern ' + f.reTxt : 'value set of ' + f.set.length + ' codes';
+      add({id:'V-01', dim:'Conformance', check:'Value conformance', field:f.k, sev:c.sev, calc:c.calc,
+        title: pctTxt(rt) + ' of present ' + f.k + ' values break the required ' + (f.re ? 'format' : 'value set'),
+        ev:[intTxt(s.valueFailN) + ' of ' + intTxt(s.present) + ' populated values fail the ' + expect + '.'],
+        action:'REPAIR',
+        rx:'Fix at the interface, not in the model pipeline. A silent coercion in the pipeline hides a broken feed and the same rows come back next extract.',
+        exec: pctTxt(rt) + ' of ' + f.k + ' values are not valid ' + (f.k === 'icd10Primary' ? 'ICD-10-CM syntax' : (f.k === 'cptPrimary' ? '5-digit procedure codes' : 'codes')) +
+              '. Those rows cannot be grouped, risk-adjusted or billed against, so they cannot be trusted as labels either.'});
+    }
+    if (s.relFailN > 0 && s.present > 0){
+      var rt2 = s.relFailN / s.present;
+      var c5 = sevCalc(50, 2000, rt2, numTxt(rt2, 4));
+      add({id:'V-02', dim:'Conformance', check:'Relational conformance', field:f.k, sev:c5.sev, calc:c5.calc,
+        title: intTxt(s.relFailN) + ' encounters reference a patient that does not exist',
+        ev:[intTxt(s.relFailN) + ' of ' + intTxt(s.present) + ' ' + f.k + ' values resolve to no row in the patient dimension (' + intTxt(res.rosterN) + ' patients).',
+            'These identifiers are well formed, so a format check alone would have passed them.'],
+        action:'EXCLUDE',
+        rx:'Quarantine these rows. They cannot be joined to history, comorbidity or prior utilisation, so any longitudinal feature computed for them is silently wrong rather than missing.',
+        exec: intTxt(s.relFailN) + ' encounters point at a patient record that is not in the extract. They look valid and they are not; they must be pulled before training, not repaired.'});
+    }
+    if (s.compFailN > 0 && s.compDen > 0){
+      var rt3 = s.compFailN / s.compDen;
+      var c6 = sevCalc(35, 400, rt3, numTxt(rt3, 4));
+      add({id:'V-03', dim:'Conformance', check:'Computational conformance', field:f.k, sev:c6.sev, calc:c6.calc,
+        title: f.k + ' disagrees with its own inputs in ' + pctTxt(rt3) + ' of rows',
+        ev:[intTxt(s.compFailN) + ' of ' + intTxt(s.compDen) + ' rows where bmi, heightCm and weightKg are all present differ by more than ' + numTxt(res.ds.bmiTol, 1) + ' kg/m² from weightKg / (heightCm/100)².'],
+        action:'EXCLUDE',
+        rx:'Do not train on the stored value. Recompute BMI from height and weight after the unit contamination is resolved, and keep the stored column only as a comparison for audit.',
+        exec:'The stored bmi contradicts the height and weight in the same row ' + pctTxt(rt3) + ' of the time. Recompute it; do not trust it.'});
+    }
+  });
+
+  /* ---------- PLAUSIBILITY: uniqueness ---------- */
+  var dp = res.ds.dups;
+  if (dp.keys > 0){
+    var rt4 = dp.rows / N;
+    var c7 = sevCalc(50, 1500, rt4, numTxt(rt4, 4));
+    add({id:'P-01a', dim:'Plausibility', check:'Uniqueness plausibility', field:'encounterId', sev:c7.sev, calc:c7.calc,
+      title:'encounterId is not unique',
+      ev:[intTxt(dp.rows) + ' rows share ' + intTxt(dp.keys) + ' duplicated keys; ' + intTxt(dp.distinct) + ' distinct keys across ' + intTxt(N) + ' rows.'],
+      action:'EXCLUDE',
+      rx:'Resolve to one row per encounter before any split. Deduplicate on the natural key (patient, admit date, facility), not on the identifier that is already known to be broken.',
+      exec:'The encounter identifier is not unique. Any train/test split keyed on it puts the same encounter on both sides, and the model will look better than it is.'});
+  }
+  var nd = res.ds.nearDup;
+  if (nd.pairs.length > 0){
+    var rt5 = nd.pairs.length / Math.max(1, nd.patients);
+    var c8 = sevCalc(45, 2000, rt5, numTxt(rt5, 4));
+    add({id:'P-01b', dim:'Plausibility', check:'Uniqueness plausibility', field:'patientId', sev:c8.sev, calc:c8.calc,
+      title: intTxt(nd.pairs.length) + ' patient pairs look like the same person registered twice',
+      ev:['Blocked on sex and zip3 (' + intTxt(nd.blocks) + ' blocks, ' + intTxt(nd.comparisons) + ' pairwise comparisons), matched on date of birth within two days.',
+          intTxt(nd.patients) + ' distinct patients in the extract.',
+          'This rule produces chance matches at this roster size; every pair needs human adjudication before merging.'],
+      action:'INVESTIGATE',
+      rx:'Route to patient-identity management. Do not auto-merge: a wrong merge fuses two people’s histories and is far more dangerous than a missed duplicate.',
+      exec: intTxt(nd.pairs.length) + ' pairs of patient records look like the same person entered twice. Until they are adjudicated, per-patient outcome rates and any patient-level split are both slightly wrong.'});
+  }
+
+  /* ---------- PLAUSIBILITY: atemporal ---------- */
+  FIELDS.forEach(function(f){
+    if (f.kind !== 'num' || f.rangeInfoOnly) return;
+    var s = fld(f.k), n = 0;
+    Object.keys(s.plaus).forEach(function(ix){
+      var v = ex.records[ix][f.k];
+      if (!isMissing(v) && typeof v === 'number' && (v < f.lo || v > f.hi)) n++;
+    });
+    if (n === 0 || !s.plausDen) return;
+    var rt = n / s.plausDen;
+    var c = sevCalc(45, 800, rt, numTxt(rt, 4));
+    add({id:'P-02a', dim:'Plausibility', check:'Atemporal plausibility', field:f.k, sev:c.sev, calc:c.calc,
+      title: intTxt(n) + ' ' + f.k + ' values are outside the survivable range',
+      ev:[intTxt(n) + ' of ' + intTxt(s.plausDen) + ' values fall outside ' + numTxt(f.lo, f.dp) + '–' + numTxt(f.hi, f.dp) + ' ' + (f.unit || ''),
+          'These are not abnormal values. They are values a living patient cannot produce.'],
+      action:'REPAIR',
+      rx:'Null these cells rather than winsorising them — a clipped impossible value is still a fabricated one. Then add a bound check at ingestion, because the absence of one is the real finding.',
+      exec: f.k + ' contains ' + intTxt(n) + ' physiologically impossible values. Few rows, quick fix — but it proves nothing is checking bounds on the way in, so assume more will arrive.'});
+  });
+  var bp = res.ds.temporal, nbp = setCount(bp.vio.sbpLeDbp);
+  if (nbp > 0 && bp.bpDen > 0){
+    var rt6 = nbp / bp.bpDen;
+    var c9 = sevCalc(45, 800, rt6, numTxt(rt6, 4));
+    ['systolicBP','diastolicBP'].forEach(function(k){
+      add({id:'P-02b', dim:'Plausibility', check:'Atemporal plausibility, cross-field', field:k, sev:c9.sev, calc:c9.calc,
+        title:'Diastolic pressure meets or exceeds systolic in ' + intTxt(nbp) + ' rows',
+        ev:[intTxt(nbp) + ' of ' + intTxt(bp.bpDen) + ' rows with both pressures present violate systolic > diastolic.',
+            'Each value is individually inside its own plausible range, so a per-field check misses this entirely.'],
+        action:'REPAIR',
+        rx:'Most likely a column swap at the interface. Confirm the direction before flipping anything, and null the pair if it cannot be confirmed.',
+        exec:'In ' + intTxt(nbp) + ' rows the two blood pressure numbers are the wrong way round. Every field passes on its own; only the pair fails. Single-column validation would have shipped this.'});
+    });
+  }
+
+  /* ---------- PLAUSIBILITY: temporal ---------- */
+  function temporalFinding(key, count, den, base, title, exec, rx){
+    if (!count || !den) return;
+    var rt = count / den;
+    var c = sevCalc(base, 1200, rt, numTxt(rt, 4));
+    add({id:'P-03', dim:'Plausibility', check:'Temporal plausibility', field:key, sev:c.sev, calc:c.calc,
+      title:title, ev:[intTxt(count) + ' of ' + intTxt(den) + ' eligible rows.'],
+      action:'REPAIR', rx:rx, exec:exec});
+  }
+  temporalFinding('dischargeDate', setCount(bp.vio.dischargeBeforeAdmit), bp.tempDen, 60,
+    intTxt(setCount(bp.vio.dischargeBeforeAdmit)) + ' encounters are discharged before they are admitted',
+    'Some encounters end before they begin. Any length-of-stay, readmission or time-to-event model built on these rows is arithmetic on impossible numbers.',
+    'Quarantine and trace to the source. This pattern usually means one of the two timestamps is being written by a different system with a different clock or a different event definition.');
+  temporalFinding('dob', setCount(bp.vio.dobAfterAdmit), fld('dob').present, 60,
+    intTxt(setCount(bp.vio.dobAfterAdmit)) + ' patients are born after the encounter they attended',
+    'A handful of patients have a date of birth later than their own admission. Every age-derived feature for those rows is fiction.',
+    'Null the date of birth and recover it from the patient master. Do not back-solve it from the stored age — the stored age is what disagrees.');
+  temporalFinding('los', setCount(bp.vio.negLos), bp.losDen, 60,
+    intTxt(setCount(bp.vio.negLos)) + ' encounters have a negative length of stay',
+    'Some stays are recorded as lasting a negative number of days. If length of stay is the outcome being predicted, these rows poison the label, not just a feature.',
+    'Recompute length of stay from admit and discharge timestamps after the ordering violations are fixed, and stop accepting a stored duration that nothing reconciles.');
+  temporalFinding('los', setCount(bp.vio.losMismatch), bp.losDen, 55,
+    intTxt(setCount(bp.vio.losMismatch)) + ' encounters have a stored length of stay that the dates do not support',
+    'The stored stay length disagrees with the admit and discharge dates on the same row. Two sources of truth, no tie-breaker.',
+    'Pick one source of truth — the timestamps — and derive the duration. Keep the stored column only to measure how often it was wrong.');
+  temporalFinding('age', setCount(bp.vio.ageDobMismatch), bp.ageDen, 55,
+    intTxt(setCount(bp.vio.ageDobMismatch)) + ' encounters have an age the date of birth contradicts',
+    'Stored age and date of birth disagree by more than a year on some rows. Age drives risk adjustment, so the error propagates into every stratified result.',
+    'Derive age at encounter from date of birth and admit date. Drop the stored column from the feature set.');
+
+  /* ---------- PLAUSIBILITY: distributional (extension) ---------- */
+  FIELDS.forEach(function(f){
+    if (f.kind !== 'num') return;
+    var nd2 = res.ds.numeric[f.k];
+    if (!nd2) return;
+    var um = nd2.um, tm = nd2.tm;
+    if (um && um.fires){
+      var co = corroborate(ex, f.k, um.bandLo);
+      var c = sevCalc(60, 250, um.share, numTxt(um.share, 4));
+      var ev = [
+        'Robust core of log ' + f.k + ': median ' + numTxt(Math.exp(um.coreMedianLog), f.dp) + ' ' + f.unit + ', one-sided MAD scale ' + numTxt(um.scale, 3) + ' in log units, fitted over ' + intTxt(um.n) + ' in-range values.',
+        'Values between ' + numTxt(um.bandLo, f.dp) + ' and ' + numTxt(um.bandHi, f.dp) + ' ' + f.unit + ' — the one-sigma band a ' + numTxt(f.factor, 4) + '× conversion lands in: ' + intTxt(um.obs) + ' observed against ' + numTxt(um.exp, 1) + ' expected under a single population, z = ' + numTxt(um.z, 1) + '.',
+        'Subgroup medians: core ' + numTxt(um.coreMedian, f.dp) + ' against band ' + numTxt(um.bandMedian, f.dp) + ' ' + f.unit + ', ratio ' + numTxt(um.ratio, 3) + ' versus the ' + numTxt(f.factor, 4) + ' conversion factor.',
+        'Excess of ' + numTxt(um.excess, 0) + ' rows in a window holding ' + pctTxt(0.6827, 1) + ' of a shifted cluster implies roughly ' + intTxt(um.est) + ' contaminated values, or ' + pctTxt(um.share) + ' of the column.',
+        'Separability check: the conversion factor sits ' + numTxt(um.sepRatio, 1) + ' core standard deviations away, so it is distinguishable from natural spread.'
+      ];
+      if (tm) ev.push('Blind two-means on the same column gives Ashman’s D = ' + numTxt(tm.D, 2) + ' — under the ~2.65 a forced split of one population produces, which is why the targeted test is the one that carries this finding.');
+      if (co.label && co.upRate !== null && co.loRate !== null){
+        ev.push('Independent cross-field corroboration: ' + pctTxt(co.upRate) + ' of values above ' + numTxt(um.bandLo, f.dp) + ' ' + f.unit + ' have ' + co.label + ', against ' + pctTxt(co.loRate) + ' below it.');
+      }
+      if (co.topShare !== null && co.topMonths.length){
+        ev.push('Those rows concentrate in ' + co.topMonths.join(', ') + ' — ' + pctTxt(co.topShare) + ' of them, across ' + intTxt(co.monthsSeen) + ' months of admissions. That points at a dated interface change, not at heavier patients.');
+      }
+      add({id:'P-04a', dim:'Plausibility', check:'Distributional — unit contamination (extension)', field:f.k, sev:c.sev, calc:c.calc,
+        title: f.k + ' holds a second population ' + numTxt(um.ratio, 2) + '× the core — ' + f.factorTxt,
+        ev:ev, action:'EXCLUDE',
+        rx:'Do not rescale on the strength of this alone — the band overlaps genuinely large values and rescaling would corrupt them. Identify the contributing feed and its date window in the source system, correct there, and re-extract. If the feed cannot be identified, exclude the field and everything derived from it.',
+        exec: f.k + ' holds two different units in one column — an estimated ' + pctTxt(um.share, 0) + ' of values are ' + f.factorTxt +
+              '. Until the source feed is found and corrected, every model using ' + f.k + ' (and the BMI derived from it) is fitting a mixture of two measurement systems, and no amount of tuning fixes that.'});
+    } else if (tm && tm.ratio && tm.D >= 3.4 && tm.minorShare >= 0.05){
+      var c10 = sevCalc(35, 150, tm.minorShare, numTxt(tm.minorShare, 4));
+      add({id:'P-04b', dim:'Plausibility', check:'Distributional — bimodality (extension)', field:f.k, sev:c10.sev, calc:c10.calc,
+        title: f.k + ' is bimodal with no matching unit-conversion explanation',
+        ev:['Lloyd k-means (k = 2) on log ' + f.k + ': Ashman’s D = ' + numTxt(tm.D, 2) + ', subgroup median ratio ' + numTxt(tm.ratio, 3) + ', minor subgroup ' + pctTxt(tm.minorShare) + '.',
+            'No declared unit-conversion factor for this field explains the separation.'],
+        action:'INVESTIGATE',
+        rx:'Two populations in one column usually means two source systems, two protocols or two patient cohorts. Find out which before modelling; a single distributional assumption over this field is wrong either way.',
+        exec: f.k + ' contains two distinct populations. That is not necessarily an error, but it is not one thing, and it should not be modelled as one thing.'});
+    }
+  });
+  var hp = res.ds.heap;
+  if (hp && hp.day1Share > hp.expShare && hp.p < 0.001 && hp.z > 3){
+    var excess = hp.day1Share - hp.expShare;
+    var c11 = sevCalc(30, 250, excess, numTxt(excess, 4));
+    add({id:'P-04c', dim:'Plausibility', check:'Distributional — date heaping (extension)', field:'admitDate', sev:c11.sev, calc:c11.calc,
+      title: pctTxt(hp.day1Share) + ' of admissions fall on the 1st of the month',
+      ev:['Expected ' + pctTxt(hp.expShare) + ' from the calendar span; observed ' + pctTxt(hp.day1Share) + ' (' + intTxt(hp.day1) + ' of ' + intTxt(hp.n) + ').',
+          'Day-of-month chi-square = ' + numTxt(hp.chi2, 1) + ' on ' + intTxt(hp.df) + ' df, ' + pTxt(hp.p) + '; standardised residual for day 1 = ' + numTxt(hp.z, 1) + '.',
+          'Smallest expected day cell ' + numTxt(hp.minExp, 1) + '.'],
+      action:'REPAIR',
+      rx:'Treat the 1st-of-month admissions as date-uncertain. Exclude day-of-month and any short-window date feature, and check whether the same rows are heaped in other date columns.',
+      exec:'One admission in ' + intTxt(Math.round(1/Math.max(hp.day1Share, 1e-9))) + ' lands on the 1st of the month, against roughly one in ' + intTxt(Math.round(1/Math.max(hp.expShare, 1e-9))) +
+           ' expected. That is a default date entered when the real one was unknown. It is not seasonality, and it must not become a feature.'});
+  }
+  FIELDS.forEach(function(f){
+    /* Scoped to quasi-identifiers. A rare diagnosis or procedure code is
+       expected and is not a data-quality defect; a rare demographic cell is
+       both a modelling and a re-identification problem. */
+    if (!f.qid) return;
+    var s = fld(f.k);
+    var cc = s.cats || categoryCounts(ex.records, f.k);
+    if (!cc.order.length) return;
+    var minV = null, minCat = null, small = [];
+    cc.order.forEach(function(v){
+      if (cc.counts[v] < 11) small.push(v + ' (' + cc.counts[v] + ')');
+      if (minV === null || cc.counts[v] < minV){ minV = cc.counts[v]; minCat = v; }
+    });
+    if (!small.length) return;
+    var c12 = sevCalc(38, 2.5, Math.max(0, 11 - minV), intTxt(Math.max(0, 11 - minV)));
+    c12.sev = Math.min(65, c12.sev); c12.calc += ', capped at 65 for this check';
+    add({id:'P-04d', dim:'Plausibility', check:'Distributional — small cell counts (extension)', field:f.k, sev:c12.sev, calc:c12.calc,
+      title: f.k + ' has ' + intTxt(small.length) + ' categor' + (small.length === 1 ? 'y' : 'ies') + ' with fewer than 11 records',
+      ev:['Smallest cell: ' + minCat + ' with ' + intTxt(minV) + ' records out of ' + intTxt(cc.n) + '.',
+          'Cells under 11: ' + small.join(', ') + '.',
+          'Eleven is the cell-size suppression threshold CMS applies to published counts; it is used here as a screening rule, not as a legal determination.'],
+      action:'INVESTIGATE',
+      rx:'Two problems, one finding. Statistically the cell is too small to estimate from — collapse it or exclude it, and never report a subgroup metric on it. For privacy, a cell this small combined with other quasi-identifiers can single out an individual, so it must be reviewed before any external release.',
+      exec: f.k + ' has categories with as few as ' + intTxt(minV) + ' records. Too small to learn from, and small enough that combined with age and location it could identify someone. Collapse or suppress before anything leaves the building.'});
+  });
+  FIELDS.forEach(function(f){
+    if (f.kind !== 'num') return;
+    var nd3 = res.ds.numeric[f.k];
+    if (!nd3 || nd3.sum.beyondRate === null || nd3.sum.beyondRate < 0.10) return;
+    var c13 = sevCalc(25, 150, nd3.sum.beyondRate, numTxt(nd3.sum.beyondRate, 3));
+    add({id:'P-04e', dim:'Plausibility', check:'Distributional — outlier concentration (extension)', field:f.k, sev:Math.min(60, c13.sev), calc:c13.calc + ', capped at 60 for this check',
+      ev:[pctTxt(nd3.sum.beyondRate) + ' of values sit beyond the Tukey 1.5 × IQR fence (' + numTxt(nd3.sum.loFence, f.dp) + ' to ' + numTxt(nd3.sum.hiFence, f.dp) + ' ' + f.unit + ').',
+          'A right-skewed laboratory value will exceed the fence naturally, so this is a prompt to look, not a defect on its own.'],
+      title: pctTxt(nd3.sum.beyondRate) + ' of ' + f.k + ' values sit beyond the Tukey fence',
+      action:'INVESTIGATE',
+      rx:'Check the tail against the plausible range and the unit-contamination result before treating it as outliers. If the distribution is genuinely skewed, transform rather than trim.',
+      exec: f.k + ' has a heavy tail. Worth a look before anyone applies an automatic outlier filter and quietly deletes the sickest patients.'});
+  });
+
+  F.sort(function(a,b){ return b.sev - a.sev || (a.field||'').localeCompare(b.field||''); });
+  res.findings = F;
+  return F;
+}
+
+/* ---------------------------------------------------------------
+   6. Scoring against the live threshold.
+   --------------------------------------------------------------- */
+var UNFIT_AT = 70, CAUTION_AT = 40;
+
+function score(res, thr){
+  var active = res.findings.filter(function(f){ return f.sev >= thr; });
+  var byField = {};
+  active.forEach(function(f){
+    if (!f.field) return;
+    if (!byField[f.field]) byField[f.field] = [];
+    byField[f.field].push(f);
+  });
+  var verdicts = {}, counts = {FIT:0, CAUTION:0, UNFIT:0};
+  FIELDS.forEach(function(f){
+    var list = byField[f.k] || [];
+    var top = list.length ? list[0] : null;
+    var v = 'FIT';
+    if (top){
+      if (top.sev >= UNFIT_AT) v = 'UNFIT';
+      else if (top.sev >= CAUTION_AT) v = 'CAUTION';
+    }
+    counts[v]++;
+    verdicts[f.k] = {v:v, top:top, list:list};
+  });
+  var maxSev = 0;
+  active.forEach(function(f){ if (f.sev > maxSev) maxSev = f.sev; });
+  var overall = maxSev >= UNFIT_AT ? 'UNFIT' : (maxSev >= CAUTION_AT ? 'CAUTION' : 'FIT');
+  return {active:active, byField:byField, verdicts:verdicts, counts:counts, maxSev:maxSev, overall:overall, thr:thr};
+}
+
+/* ===== COMPUTE END ===== */
+
+/* ---------------------------------------------------------------
+   7. Rendering. Inline SVG only; no library, no image, no network.
+   --------------------------------------------------------------- */
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function pillOf(v){
+  var cls = v === 'FIT' ? 'p-fit' : (v === 'CAUTION' ? 'p-caution' : 'p-unfit');
+  return '<span class="pill ' + cls + '">' + v + '</span>';
+}
+function sevBar(sev){
+  var w = Math.max(1, Math.round(sev / 100 * 64));
+  var cls = sev >= UNFIT_AT ? 'sev-hi' : (sev >= CAUTION_AT ? 'sev-mid' : 'sev-lo');
+  return '<svg width="64" height="6" viewBox="0 0 64 6" role="img" aria-label="severity ' + sev + ' of 100">' +
+         '<rect class="sev-bg" x="0" y="0" width="64" height="6"></rect>' +
+         '<rect class="' + cls + '" x="0" y="0" width="' + w + '" height="6"></rect></svg>';
+}
+
+var EX, RES, STATE = {thr:30, showPass:true};
+
+function renderSummary(){
+  var s = RES.ds.recordComplete, dp = RES.ds.dups;
+  var html = '';
+  function cell(k, v, small){ return '<div><div class="k">' + k + '</div><div class="v' + (small ? ' sm' : '') + '">' + v + '</div></div>'; }
+  html += cell('Encounters', intTxt(RES.n));
+  html += cell('Patients', intTxt(RES.rosterN));
+  html += cell('Fields profiled', intTxt(FIELDS.length));
+  html += cell('Complete records', pctTxt(s.fullRate, 1));
+  document.getElementById('summary').innerHTML = html;
+  document.getElementById('seedline').textContent =
+    'mulberry32 seed ' + RES.seed + ' · ' + intTxt(dp.distinct) + ' distinct encounter keys';
+}
+
+function renderVerdict(sc){
+  var cls = sc.overall === 'UNFIT' ? 'is-unfit' : (sc.overall === 'CAUTION' ? 'is-caution' : 'is-fit');
+  var head = sc.overall === 'UNFIT'
+      ? 'Not fit for model training as delivered.'
+      : (sc.overall === 'CAUTION'
+        ? 'Fit for model training only after the remediation below.'
+        : 'No blocking defects at this severity threshold.');
+  var sub;
+  if (sc.active.length === 0){
+    sub = 'No finding reaches severity ' + sc.thr + '. That is a statement about the threshold, not a clean bill of health — lower it to see what is being suppressed.';
+  } else {
+    sub = intTxt(sc.active.length) + ' of ' + intTxt(RES.findings.length) + ' findings reach severity ' + sc.thr + '. ' +
+          intTxt(sc.counts.UNFIT) + ' field' + (sc.counts.UNFIT === 1 ? '' : 's') + ' unfit, ' +
+          intTxt(sc.counts.CAUTION) + ' caution, ' + intTxt(sc.counts.FIT) + ' clear. ' +
+          'Highest severity ' + intTxt(sc.maxSev) + '.';
+  }
+  document.getElementById('verdict').innerHTML =
+    '<div class="verdict ' + cls + '"><div class="k">Verdict at severity ≥ ' + sc.thr + '</div>' +
+    '<div class="v">' + esc(head) + '</div><div class="sub">' + esc(sub) + '</div></div>';
+
+  var rank = {EXCLUDE:0, REPAIR:1, INVESTIGATE:2};
+  var rows = [];
+  FIELDS.forEach(function(f){
+    var vd = sc.verdicts[f.k];
+    if (vd.v === 'FIT' || !vd.top) return;
+    rows.push({field:f.k, v:vd.v, f:vd.top});
+  });
+  rows.sort(function(a,b){
+    return (rank[a.f.action] - rank[b.f.action]) || (b.f.sev - a.f.sev) || a.field.localeCompare(b.field);
+  });
+  var dsOnly = sc.active.filter(function(x){ return !x.field; });
+  var html = '';
+  if (!rows.length && !dsOnly.length){
+    html = '<div class="empty">No field requires exclusion or repair at this threshold.</div>';
+  } else {
+    var tally = {EXCLUDE:0, REPAIR:0, INVESTIGATE:0};
+    rows.forEach(function(r){ tally[r.f.action]++; });
+    dsOnly.forEach(function(x){ if (tally[x.action] !== undefined) tally[x.action]++; });
+    html += '<div class="call"><div class="who"><span class="fld">Before training</span></div>' +
+            '<div class="why"><span class="act-exclude">' + tally.EXCLUDE + ' exclude</span> &nbsp;·&nbsp; ' +
+            '<span class="act-repair">' + tally.REPAIR + ' repair</span> &nbsp;·&nbsp; ' +
+            '<span class="act-watch">' + tally.INVESTIGATE + ' investigate</span>. ' +
+            'Excluding a field costs signal; leaving a broken one in costs a model nobody can defend. ' +
+            'Each line below states which and why.</div></div>';
+    rows.forEach(function(r){
+      var acls = r.f.action === 'EXCLUDE' ? 'act-exclude' : (r.f.action === 'REPAIR' ? 'act-repair' : 'act-watch');
+      html += '<div class="call"><div class="who"><span class="fld">' + esc(r.field) + '</span>' +
+              '<span class="' + acls + '">' + r.f.action + '</span></div>' +
+              '<div class="why">' + esc(r.f.exec) + '</div></div>';
+    });
+    dsOnly.forEach(function(x){
+      html += '<div class="call"><div class="who"><span class="fld">whole extract</span>' +
+              '<span class="act-repair">' + x.action + '</span></div>' +
+              '<div class="why">' + esc(x.exec) + '</div></div>';
+    });
+  }
+  document.getElementById('calls').innerHTML = html;
+}
+
+function renderFieldTable(sc){
+  var html = '', shown = 0;
+  FIELDS.forEach(function(f){
+    var s = RES.fields[f.k], vd = sc.verdicts[f.k];
+    if (!STATE.showPass && vd.v === 'FIT') return;
+    shown++;
+    var reason = !vd.top
+      ? 'No finding at or above severity ' + sc.thr + '.'
+      : (vd.v === 'FIT'
+          ? 'Noted but below the caution bar of ' + CAUTION_AT + ': ' + vd.top.title.charAt(0).toLowerCase() + vd.top.title.slice(1)
+          : vd.top.title);
+    html += '<tr>' +
+      '<td class="fld">' + esc(f.k) + '</td>' +
+      '<td>' + esc(f.kind === 'num' ? 'numeric' : (f.kind === 'cat' ? 'category' : (f.kind === 'code' ? 'code' : f.kind))) + '</td>' +
+      '<td class="n">' + pctTxt(s.missingRate) + '</td>' +
+      '<td class="n">' + pctTxt(s.confRate) + '</td>' +
+      '<td class="n">' + pctTxt(s.plausRate) + '</td>' +
+      '<td>' + pillOf(vd.v) + '</td>' +
+      '<td class="reason">' + esc(reason) + '</td></tr>';
+  });
+  if (!shown) html = '<tr><td colspan="7"><div class="empty">No fields to show. Turn on "show passing fields".</div></td></tr>';
+  document.getElementById('fieldrows').innerHTML = html;
+  document.getElementById('fieldcount').textContent =
+    intTxt(shown) + ' of ' + intTxt(FIELDS.length) + ' fields shown';
+}
+
+function missMatrix(){
+  if (RES.ds.hm) return RES.ds.hm;
+  var cols = PAYERS.filter(function(p){ return (RES.ds.payerCounts.counts[p] || 0) > 0; });
+  var rows = [], tot = {};
+  cols.forEach(function(p){ tot[p] = RES.ds.payerCounts.counts[p]; });
+  FIELDS.forEach(function(f){
+    var s = RES.fields[f.k];
+    if (!s.missing) return;
+    var m = {};
+    cols.forEach(function(p){ m[p] = 0; });
+    EX.records.forEach(function(rec){
+      if (m[rec.payerType] === undefined) return;
+      if (isMissing(rec[f.k])) m[rec.payerType]++;
+    });
+    var cells = cols.map(function(p){ return tot[p] ? m[p]/tot[p] : null; });
+    rows.push({k:f.k, cells:cells, overall:s.missingRate, chi:s.chi});
+  });
+  rows.sort(function(a,b){ return b.overall - a.overall; });
+  RES.ds.hm = {cols:cols, tot:tot, rows:rows};
+  return RES.ds.hm;
+}
+
+function renderHeatmap(){
+  var hm = missMatrix();
+  var LW = 152, CW = 94, CH = 26, HH = 46, VW = 86, LEG = 40;
+  var W = LW + hm.cols.length*CW + VW, H = HH + hm.rows.length*CH + LEG;
+  var max = 0;
+  hm.rows.forEach(function(r){ r.cells.forEach(function(v){ if (v !== null && v > max) max = v; }); });
+  if (max <= 0) max = 1;
+  var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" ' +
+          'aria-label="Missingness rate by field and payer type. Darker cells are higher missing rates.">';
+  s += '<text class="hm-lab" x="0" y="16">FIELD</text>';
+  hm.cols.forEach(function(p, i){
+    var x = LW + i*CW + CW/2;
+    s += '<text class="hm-lab" x="' + x + '" y="16" text-anchor="middle">' + esc(p.toUpperCase()) + '</text>';
+    s += '<text class="hm-lab" x="' + x + '" y="32" text-anchor="middle">n=' + intTxt(hm.tot[p]) + '</text>';
+  });
+  s += '<text class="hm-lab" x="' + (W - 4) + '" y="16" text-anchor="end">CRAMÉR’S V</text>';
+  s += '<line class="hm-grid" x1="0" y1="' + (HH - 8) + '" x2="' + W + '" y2="' + (HH - 8) + '"></line>';
+  hm.rows.forEach(function(r, ri){
+    var y = HH + ri*CH;
+    s += '<text class="hm-fld" x="0" y="' + (y + 17) + '">' + esc(r.k) + '</text>';
+    r.cells.forEach(function(v, ci){
+      var x = LW + ci*CW;
+      var op = v === null ? 0 : 0.06 + 0.88 * (v / max);
+      s += '<rect class="hm-cell" x="' + (x + 1) + '" y="' + (y + 1) + '" width="' + (CW - 2) + '" height="' + (CH - 2) + '" fill-opacity="' + numTxt(op, 3) + '"></rect>';
+      s += '<text class="' + (op > 0.5 ? 'hm-txt-i' : 'hm-txt') + '" x="' + (x + CW/2) + '" y="' + (y + 17) + '" text-anchor="middle">' + (v === null ? '—' : pctTxt(v, 0)) + '</text>';
+    });
+    var vtxt = '—';
+    if (r.chi){
+      vtxt = r.chi.minExp >= 5 ? numTxt(r.chi.V, 3) : 'n/e';
+    }
+    s += '<text class="hm-txt" x="' + (W - 4) + '" y="' + (y + 17) + '" text-anchor="end">' + vtxt + '</text>';
+  });
+  var ly = HH + hm.rows.length*CH + 22;
+  s += '<text class="hm-lab" x="0" y="' + ly + '">SCALE</text>';
+  for (var i = 0; i <= 4; i++){
+    var op2 = 0.06 + 0.88 * (i/4);
+    s += '<rect class="hm-cell" x="' + (LW + i*54) + '" y="' + (ly - 11) + '" width="30" height="14" fill-opacity="' + numTxt(op2, 3) + '"></rect>';
+    s += '<text class="hm-lab" x="' + (LW + i*54 + 34) + '" y="' + ly + '">' + pctTxt(max*i/4, 0) + '</text>';
+  }
+  s += '</svg>';
+  document.getElementById('heatmap').innerHTML = s;
+
+  var suppressed = [];
+  FIELDS.forEach(function(f){
+    var c = RES.fields[f.k].chi;
+    if (c && c.minExp < 5) suppressed.push(f.k);
+  });
+  document.getElementById('hmnote').innerHTML =
+    'Each cell is the share of that payer’s encounters with no value in that field; the scale is relative to the highest cell (' + pctTxt(max, 0) + '). ' +
+    'A row of even tint is missingness at random and is survivable. A row with one dark cell is missingness that encodes who the patient is, and it is not. ' +
+    'The right-hand column is Cramér’s V for the field-by-payer contingency table — 0 means no association. ' +
+    (suppressed.length
+      ? '<code>n/e</code> marks ' + intTxt(suppressed.length) + ' field' + (suppressed.length === 1 ? '' : 's') + ' (' + esc(suppressed.join(', ')) + ') where an expected cell fell below five, so the chi-square approximation is not trustworthy and no finding is raised.'
+      : 'Every tested field met the expected-cell-count-of-five rule.');
+}
+
+function sparkline(f, ns){
+  var sum = ns.sum;
+  if (!sum.n || sum.min === null) return '<span class="mono">—</span>';
+  var lo = sum.p01, hi = sum.p99;
+  if (sum.loFence !== null){ lo = Math.min(lo, sum.loFence); hi = Math.max(hi, sum.hiFence); }
+  if (!(hi > lo)){ hi = lo + Math.max(1, Math.abs(lo) * 0.01); }
+  var W = 150, H = 34, B = 22, i;
+  var bins = [];
+  for (i=0;i<B;i++) bins.push(0);
+  for (i=0;i<sum.sorted.length;i++){
+    var t = (sum.sorted[i] - lo) / (hi - lo);
+    bins[Math.floor(clamp(t, 0, 0.999999) * B)]++;
+  }
+  var mx = 0;
+  for (i=0;i<B;i++) if (bins[i] > mx) mx = bins[i];
+  if (!mx) mx = 1;
+  var bw = W / B;
+  var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' +
+          esc('Distribution of ' + f.k + '. Median ' + numTxt(sum.med, f.dp) + ' ' + (f.unit || '') +
+              ', Tukey fence ' + numTxt(sum.loFence, f.dp) + ' to ' + numTxt(sum.hiFence, f.dp) + '.') + '">';
+  for (i=0;i<B;i++){
+    if (!bins[i]) continue;
+    var h = Math.max(1, Math.round(bins[i] / mx * (H - 8)));
+    s += '<rect class="spark-bar" x="' + numTxt(i*bw, 2) + '" y="' + (H - 4 - h) + '" width="' + numTxt(Math.max(1, bw - 1), 2) + '" height="' + h + '"></rect>';
+  }
+  s += '<line class="spark-base" x1="0" y1="' + (H - 3.5) + '" x2="' + W + '" y2="' + (H - 3.5) + '"></line>';
+  function mark(v, cls){
+    if (v === null || !isFinite(v) || v < lo || v > hi) return '';
+    var x = (v - lo) / (hi - lo) * W;
+    return '<line class="' + cls + '" x1="' + numTxt(x, 2) + '" y1="0" x2="' + numTxt(x, 2) + '" y2="' + (H - 3) + '"></line>';
+  }
+  s += mark(sum.loFence, 'spark-fence') + mark(sum.hiFence, 'spark-fence') + mark(sum.med, 'spark-med');
+  s += '</svg>';
+  return s;
+}
+
+function oorCount(k, f){
+  var n = 0;
+  EX.records.forEach(function(rec){
+    var v = rec[k];
+    if (isMissing(v) || typeof v !== 'number') return;
+    if (v < f.lo || v > f.hi) n++;
+  });
+  return n;
+}
+
+function renderNumeric(){
+  var html = '';
+  FIELDS.forEach(function(f){
+    if (f.kind !== 'num') return;
+    var ns = RES.ds.numeric[f.k], sum = ns.sum;
+    var oor = oorCount(f.k, f);
+    html += '<tr>' +
+      '<td class="fld">' + esc(f.k) + '<br><span class="mono">' + esc(f.unit || '') + '</span></td>' +
+      '<td>' + sparkline(f, ns) + '</td>' +
+      '<td class="n">' + intTxt(sum.n) + '</td>' +
+      '<td class="n">' + numTxt(sum.med, f.dp) + ' (' + numTxt(sum.q1, f.dp) + '–' + numTxt(sum.q3, f.dp) + ')</td>' +
+      '<td class="n">' + numTxt(f.lo, f.dp) + '–' + numTxt(f.hi, f.dp) + '</td>' +
+      '<td class="n">' + numTxt(sum.loFence, f.dp) + '–' + numTxt(sum.hiFence, f.dp) + '</td>' +
+      '<td class="n">' + pctTxt(rate(oor, sum.n), 2) + '</td>' +
+      '<td class="n">' + pctTxt(sum.beyondRate, 1) + '</td></tr>';
+  });
+  document.getElementById('numrows').innerHTML = html;
+}
+
+function renderFindings(sc){
+  var html = '';
+  if (!sc.active.length){
+    html = '<div class="empty">No finding reaches severity ' + sc.thr + '. Lower the threshold.</div>';
+  } else {
+    sc.active.forEach(function(x){
+      html += '<div class="finding"><div class="f-top">' +
+        '<span class="f-id">' + esc(x.id) + ' &nbsp;·&nbsp; ' + esc(x.dim) + ' &nbsp;·&nbsp; ' + esc(x.check) +
+        (x.field ? ' &nbsp;·&nbsp; ' + esc(x.field) : '') + '</span>' +
+        '<span class="f-sev">' + sevBar(x.sev) + ' ' + intTxt(x.sev) + ' / 100</span></div>' +
+        '<div class="f-title">' + esc(x.title) + '</div><ul class="f-ev">';
+      x.ev.forEach(function(e){ html += '<li>' + esc(e) + '</li>'; });
+      html += '<li class="calc">' + esc(x.calc) + '</li></ul>' +
+        '<p class="f-rx"><b>' + esc(x.action) + '</b> &nbsp;' + esc(x.rx) + '</p></div>';
+    });
+  }
+  document.getElementById('findings').innerHTML = html;
+  document.getElementById('findcount').textContent =
+    intTxt(sc.active.length) + ' of ' + intTxt(RES.findings.length) + ' at severity ≥ ' + sc.thr;
+}
+
+function renderTruth(){
+  var t = RES.truth, V = RES.ds.temporal.vio, rows = [];
+  function oor(k){ return oorCount(k, FIELD_BY_KEY[k]); }
+  var lbFail = 0;
+  Object.keys(RES.fields.bmi.compFail).forEach(function(ix){ if (t._lbRows && t._lbRows[ix]) lbFail++; });
+  var wum = RES.ds.numeric.weightKg.um;
+  var hp = RES.ds.heap;
+  var expDay1 = hp ? Math.round(hp.n * hp.expShare) : null;
+
+  /* If a planted count and a flagged count ever drift apart without a stated
+     reason, say so rather than printing "Exact." over a discrepancy. */
+  function exact(p, f){ return p === f ? 'Exact.' : 'Unexplained difference of ' + intTxt(Math.abs(f - p)) + ' rows — investigate before trusting this check.'; }
+  rows.push(['Discharge before admit', 'P-03 temporal', t.dischargeBeforeAdmit, setCount(V.dischargeBeforeAdmit), exact(t.dischargeBeforeAdmit, setCount(V.dischargeBeforeAdmit))]);
+  rows.push(['Negative length of stay', 'P-03 temporal', t.dischargeBeforeAdmit + t.negativeLosOnly, setCount(V.negLos),
+             'Both planted groups carry a negative stay: ' + t.dischargeBeforeAdmit + ' with reversed dates and ' + t.negativeLosOnly + ' with intact dates.']);
+  rows.push(['Stay length contradicts dates', 'P-03 temporal', t.negativeLosOnly, setCount(V.losMismatch), t.negativeLosOnly === setCount(V.losMismatch) ? 'Exact — the reversed-date group stays internally consistent by construction.' : exact(t.negativeLosOnly, setCount(V.losMismatch))]);
+  rows.push(['Birth after admit', 'P-03 temporal', t.dobAfterAdmit, setCount(V.dobAfterAdmit), exact(t.dobAfterAdmit, setCount(V.dobAfterAdmit))]);
+  rows.push(['Age contradicts date of birth', 'P-03 temporal', t.dobAfterAdmit, setCount(V.ageDobMismatch), 'Same rows: moving the birth date breaks the stored age too.']);
+  rows.push(['Diastolic above systolic', 'P-02b cross-field', t.sbpLeDbp, setCount(V.sbpLeDbp), exact(t.sbpLeDbp, setCount(V.sbpLeDbp))]);
+  rows.push(['Malformed ICD-10-CM', 'V-01 value', t.badIcd10, RES.fields.icd10Primary.valueFailN, exact(t.badIcd10, RES.fields.icd10Primary.valueFailN)]);
+  rows.push(['Malformed CPT', 'V-01 value', t.badCpt, RES.fields.cptPrimary.valueFailN, exact(t.badCpt, RES.fields.cptPrimary.valueFailN)]);
+  rows.push(['Invalid discharge disposition', 'V-01 value', t.badDispo, RES.fields.dispositionCode.valueFailN, exact(t.badDispo, RES.fields.dispositionCode.valueFailN)]);
+  rows.push(['Orphan patient reference', 'V-02 relational', t.orphanPatient, RES.fields.patientId.relFailN, exact(t.orphanPatient, RES.fields.patientId.relFailN)]);
+  rows.push(['Duplicate encounter keys', 'P-01a uniqueness', t.dupEncounterId, RES.ds.dups.keys, (t.dupEncounterId === RES.ds.dups.keys ? 'Exact — ' : 'Difference noted — ') + intTxt(RES.ds.dups.rows) + ' rows across ' + intTxt(RES.ds.dups.keys) + ' keys.']);
+  rows.push(['Near-duplicate patients', 'P-01b uniqueness', t.nearDupPatients, RES.ds.nearDup.pairs.length,
+             'Chance matches at this roster size account for the difference. The check is a screen, not a determination.']);
+  rows.push(['BMI contradicts height and weight', 'V-03 computational', t.bmiSlip, RES.fields.bmi.compFailN,
+             intTxt(lbFail) + ' further rows fail because their weight is in pounds while the stored BMI is correct. Two planted defects, one check, and they corroborate each other.']);
+  rows.push(['Weight recorded in pounds', 'P-04a distributional', t.poundsRows, wum && wum.fires ? Math.round(wum.est) : 0,
+             wum && wum.fires
+               ? 'A count estimated from the excess over the fitted null, not a row list — the contaminated and genuine populations overlap, so no test can name the individual rows.'
+               : 'Not detected.']);
+  rows.push(['Impossible heart rate', 'P-02a atemporal', t.hrImpossible, oor('heartRate'), exact(t.hrImpossible, oor('heartRate'))]);
+  rows.push(['Impossible temperature', 'P-02a atemporal', t.tempImpossible, oor('temperatureC'), exact(t.tempImpossible, oor('temperatureC'))]);
+  rows.push(['Impossible SpO₂', 'P-02a atemporal', t.spo2Impossible, oor('spo2'), exact(t.spo2Impossible, oor('spo2'))]);
+  rows.push(['Impossible systolic', 'P-02a atemporal', t.sbpImpossible, oor('systolicBP'), exact(t.sbpImpossible, oor('systolicBP'))]);
+  rows.push(['Impossible glucose', 'P-02a atemporal', t.glucoseImpossible, oor('glucose'), exact(t.glucoseImpossible, oor('glucose'))]);
+  rows.push(['Impossible creatinine', 'P-02a atemporal', t.creatImpossible, oor('creatinine'), exact(t.creatImpossible, oor('creatinine'))]);
+  rows.push(['Admissions snapped to the 1st', 'P-04c distributional', t.heaped, hp ? (hp.day1 - expDay1) : 0,
+             hp ? 'Flagged figure is the excess over the ' + intTxt(expDay1) + ' expected from the calendar, since genuine 1st-of-month admissions cannot be told apart from imputed ones.' : 'Not detected.']);
+
+  var html = '';
+  rows.forEach(function(r){
+    html += '<tr><td>' + esc(r[0]) + '</td><td class="fld">' + esc(r[1]) + '</td>' +
+            '<td class="n">' + intTxt(r[2]) + '</td><td class="n">' + intTxt(r[3]) + '</td>' +
+            '<td class="reason">' + esc(r[4]) + '</td></tr>';
+  });
+  document.getElementById('truthrows').innerHTML = html;
+}
+
+function renderAll(){
+  var sc = score(RES, STATE.thr);
+  renderVerdict(sc);
+  renderFieldTable(sc);
+  renderFindings(sc);
+}
+
+(function init(){
+  EX = buildExtract(SEED);
+  RES = profile(EX);
+  buildFindings(RES, EX);
+  renderSummary();
+  renderHeatmap();
+  renderNumeric();
+  renderTruth();
+  renderAll();
+
+  var sev = document.getElementById('sev'), out = document.getElementById('sevOut'), sp = document.getElementById('showpass');
+  sev.addEventListener('input', function(){
+    STATE.thr = parseInt(sev.value, 10) || 0;
+    out.textContent = STATE.thr;
+    renderAll();
+  });
+  sp.addEventListener('change', function(){
+    STATE.showPass = sp.checked;
+    renderAll();
+  });
+  STATE.thr = parseInt(sev.value, 10) || 0;
+  out.textContent = STATE.thr;
+  STATE.showPass = sp.checked;
+  renderAll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clinical AI Readiness Assessment — Nikhila Veeramalla</title>
+<meta name="description" content="A weighted, blocker-gated go/no-go instrument for a proposed clinical AI use case. Encodes the 21st Century Cures Act CDS carve-out test and the IMDRF SaMD risk categorisation. Demonstration only.">
+<meta name="theme-color" content="#fbfaf8">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%236b4e12'/%3E%3Ctext x='32' y='44' font-family='Georgia,serif' font-size='33' font-weight='600' fill='%23fbfaf8' text-anchor='middle'%3ENV%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#fbfaf8; --band:#f3f1eb; --ink:#14120f; --body:#3c3630; --muted:#6f675d;
+  --rule:#e2ded4; --rule-2:#cfc9bc; --accent:#6b4e12;
+  --ok:#1f5d3a; --warn:#8a5a12; --bad:#8c2f24;
+  --rail:180px; --max:1160px; --gut:32px;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);color:var(--body);
+  font-family:var(--sans);font-size:17px;line-height:1.7;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  overflow-x:hidden;
+}
+::selection{background:var(--accent);color:var(--paper)}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 var(--gut)}
+@media(max-width:640px){:root{--gut:24px}}
+
+h1,h2,h3{font-family:var(--serif);color:var(--ink);font-weight:400;letter-spacing:-.018em}
+h1{font-size:clamp(32px,6vw,56px);line-height:1.02;font-weight:300;letter-spacing:-.032em}
+h2{font-size:clamp(21px,3.2vw,40px);line-height:1.16}
+h3{font-size:21px;line-height:1.35;font-weight:500}
+p{max-width:37rem}
+strong{font-weight:500;color:var(--ink)}
+
+.label,.mono{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+}
+.label .num{color:var(--accent)}
+.fig,table,.tnum{font-variant-numeric:tabular-nums lining-nums}
+
+/* ---------- masthead ---------- */
+.mast{border-bottom:1px solid var(--rule)}
+.mast-in{max-width:var(--max);margin:0 auto;padding:16px var(--gut);display:flex;align-items:center;justify-content:space-between;gap:16px}
+.mast a.back{
+  font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:3px;
+  transition:color .14s,border-color .14s;
+}
+.mast a.back:hover{color:var(--ink);border-bottom-color:var(--accent)}
+.mast .toolname{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);text-align:right}
+
+/* ---------- actions ---------- */
+.act{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;
+  text-decoration:none;color:var(--ink);
+  padding:12px 20px;border:1px solid var(--rule-2);background:transparent;cursor:pointer;
+  transition:background .14s,color .14s,border-color .14s;
+}
+.act:hover{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.act.solid{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+.act.solid:hover{background:var(--ink);border-color:var(--ink)}
+.act[aria-pressed="true"]{background:var(--accent);color:var(--paper);border-color:var(--accent)}
+
+/* ---------- title block ---------- */
+.titleblock{padding:72px 0 56px;border-bottom:1px solid var(--rule)}
+.eyebrow{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.eyebrow .bar{width:40px;height:1px;background:var(--accent);flex:none}
+.titleblock p.stand{margin-top:24px;font-size:17px;color:var(--body);max-width:37rem}
+
+section{padding:56px 0}
+.sec-head{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;align-items:baseline;padding-bottom:24px;border-bottom:1px solid var(--rule)}
+@media(max-width:820px){.sec-head{grid-template-columns:1fr;gap:16px}}
+.sec-head .deck{color:var(--muted);max-width:37rem;margin-top:16px}
+.band{background:var(--band);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+
+/* ---------- how it works ---------- */
+ol.steps{list-style:none;margin-top:32px;border-top:1px solid var(--rule)}
+ol.steps li{display:grid;grid-template-columns:var(--rail) 1fr;gap:40px;padding:24px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+@media(max-width:820px){ol.steps li{grid-template-columns:1fr;gap:8px}}
+ol.steps .n{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+ol.steps .b{max-width:44rem}
+
+/* ---------- notices ---------- */
+.notice{border:1px solid var(--rule-2);padding:16px;margin-top:24px;background:var(--paper)}
+.notice.hard{border-color:var(--bad)}
+.notice .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px}
+.notice.hard .k{color:var(--bad)}
+.notice p{font-size:14px;line-height:1.6;max-width:60rem}
+
+/* ---------- tool shell ---------- */
+.tool{border:1px solid var(--rule);margin-top:32px;background:var(--paper)}
+.tool-bar{padding:16px;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:var(--band)}
+.tool-bar .grp{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tool-bar .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-right:8px}
+.pad{padding:24px}
+@media(max-width:640px){.pad{padding:16px}}
+.sub{border-top:1px solid var(--rule)}
+.blockhead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:16px}
+
+/* ---------- verdict ---------- */
+.verdict-grid{display:grid;grid-template-columns:1fr 320px;gap:40px;align-items:start}
+@media(max-width:900px){.verdict-grid{grid-template-columns:1fr;gap:32px}}
+.badge{
+  display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  padding:12px 20px;border:1px solid var(--rule-2);color:var(--ink);background:var(--paper);
+}
+.badge.b-ok{border-color:var(--ok);color:var(--ok)}
+.badge.b-warn{border-color:var(--warn);color:var(--warn)}
+.badge.b-bad{border-color:var(--bad);color:var(--bad);background:var(--band)}
+.score-line{margin-top:24px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.score-line .fig{font-family:var(--serif);font-size:40px;line-height:1;color:var(--accent);letter-spacing:-.02em}
+.score-line .of{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.vsum{margin-top:16px;font-size:14px;color:var(--body);max-width:44rem}
+.meter{margin-top:16px;max-width:320px}
+.meter svg{display:block;width:100%;height:6px}
+.meterk{margin-top:8px}
+
+/* ---------- radar ---------- */
+.radar{max-width:520px}
+.radar svg{display:block;width:100%;height:auto}
+.weakest{margin-top:12px;font-size:14px;color:var(--body)}
+
+/* ---------- tables ---------- */
+.tscroll{overflow-x:auto;margin-top:16px;border-top:1px solid var(--rule);-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14px}
+table.narrow{min-width:520px}
+th{
+  font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);text-align:left;padding:12px 16px 12px 0;border-bottom:1px solid var(--rule-2);vertical-align:bottom;
+}
+td{padding:12px 16px 12px 0;border-bottom:1px solid var(--rule);vertical-align:top;line-height:1.55}
+th:last-child,td:last-child{padding-right:0}
+td .qs{color:var(--ink);font-weight:500;display:block}
+td .obs{color:var(--muted);display:block;margin-top:8px}
+.sevcell{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.sev{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap}
+.sev.s-bad{color:var(--bad)}
+.sev.s-warn{color:var(--warn)}
+.sev.s-low{color:var(--muted)}
+.sev.s-blk{color:var(--paper);background:var(--bad);padding:2px 8px;display:inline-block}
+.barcell{min-width:120px}
+.barcell svg{display:block;width:100%;height:8px}
+
+/* ---------- regulatory card ---------- */
+.gates{margin-top:16px;border-top:1px solid var(--rule)}
+.gate{display:grid;grid-template-columns:64px 1fr 96px;gap:16px;padding:12px 0;border-bottom:1px solid var(--rule);align-items:start}
+@media(max-width:640px){.gate{grid-template-columns:48px 1fr;gap:8px}.gate .gv{grid-column:1 / -1}}
+/* statutory citations keep their own case: FD&C Act clauses (i)-(iv) and subsection (o)
+   are lower-case in the statute, and upper-casing them cites a different subdivision */
+.nocaps{text-transform:none}
+.gate .gk{font-family:var(--mono);font-size:11px;letter-spacing:.13em;color:var(--accent);text-transform:none;padding-top:2px}
+.gate .gt{font-size:14px}
+.gate .gt .gnote{display:block;color:var(--muted);margin-top:8px}
+.gate .gv{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;text-align:right}
+@media(max-width:640px){.gate .gv{text-align:left}}
+.gv.g-pass{color:var(--ok)}
+.gv.g-fail{color:var(--bad)}
+.gv.g-und{color:var(--muted)}
+.determ{margin-top:16px;padding:16px;border:1px solid var(--rule-2);background:var(--band)}
+.determ .k{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:8px}
+.determ .v{font-family:var(--serif);font-size:21px;color:var(--ink);line-height:1.35}
+.determ .why{font-size:14px;margin-top:12px;color:var(--body)}
+
+/* ---------- blockers ---------- */
+ul.blist{list-style:none;margin-top:16px;border-top:1px solid var(--rule)}
+ul.blist li{padding:16px 0;border-bottom:1px solid var(--rule);display:grid;grid-template-columns:96px 1fr;gap:16px;align-items:start}
+@media(max-width:640px){ul.blist li{grid-template-columns:1fr;gap:8px}}
+ul.blist .bk{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--paper);background:var(--bad);padding:2px 8px;display:inline-block;justify-self:start}
+ul.blist .bt{font-size:14px}
+ul.blist .bt .bwhy{display:block;color:var(--muted);margin-top:8px}
+.clear-note{font-size:14px;color:var(--muted);margin-top:16px}
+
+/* ---------- exec summary ---------- */
+.exec{font-family:var(--serif);font-size:21px;line-height:1.5;color:var(--ink);max-width:44rem;margin-top:16px}
+
+/* ---------- questionnaire ---------- */
+.qform{margin-top:0}
+details.dim{border-top:1px solid var(--rule)}
+details.dim:last-of-type{border-bottom:1px solid var(--rule)}
+summary.dimhead{
+  list-style:none;cursor:pointer;padding:16px;display:grid;
+  grid-template-columns:24px 1fr 96px 96px;gap:16px;align-items:baseline;
+}
+summary.dimhead::-webkit-details-marker{display:none}
+@media(max-width:760px){summary.dimhead{grid-template-columns:24px 1fr 72px;gap:12px}summary.dimhead .dsub{display:none}}
+summary.dimhead:hover{background:var(--band)}
+.tog{font-family:var(--mono);font-size:14px;color:var(--accent);line-height:1}
+.tog::after{content:"+"}
+details[open] > summary .tog::after{content:"\2212"}
+.dname{font-family:var(--serif);font-size:17px;color:var(--ink)}
+.dwt,.dsc{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);text-align:right}
+.dsc{color:var(--ink)}
+.dimbody{padding:0 16px 16px 16px}
+.dimwhy{font-size:14px;color:var(--muted);max-width:44rem;padding-bottom:16px;border-bottom:1px solid var(--rule)}
+fieldset{border:0;padding:24px 0;border-bottom:1px solid var(--rule)}
+fieldset:last-of-type{border-bottom:0}
+legend{padding:0;margin-bottom:12px;max-width:44rem}
+legend .qn{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:8px}
+legend .qt{font-size:17px;color:var(--ink);display:block}
+legend .qw{font-family:var(--mono);font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);display:block;margin-top:8px}
+.opts{display:grid;gap:8px;max-width:52rem}
+.opt{display:grid;grid-template-columns:16px 24px 1fr;gap:12px;align-items:start;padding:12px;border:1px solid var(--rule);cursor:pointer;transition:background .14s,border-color .14s}
+.opt:hover{background:var(--band)}
+.opt.is-on{background:var(--band);border-color:var(--accent)}
+.opt input{
+  appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:4px;
+  border:1px solid var(--rule-2);background:var(--paper);cursor:pointer;flex:none;
+}
+.opt input:checked{background:var(--accent);border-color:var(--accent)}
+.opt .ov{font-family:var(--mono);font-size:11px;letter-spacing:.13em;color:var(--muted);padding-top:3px}
+.opt.is-on .ov{color:var(--accent)}
+.opt .ot{font-size:14px;line-height:1.55}
+.opt.is-on .ot{color:var(--ink)}
+.classify{padding:24px 0;border-bottom:1px solid var(--rule)}
+.classify .ck{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.classify .cn{font-size:14px;color:var(--muted);max-width:44rem;margin-bottom:16px}
+
+/* ---------- print record ---------- */
+.print-only{display:none}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:56px}
+.foot{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted)}
+
+@media(prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+
+@media print{
+  .mast,.tool-bar,.qform,.noprint,footer .foot a{display:none}
+  body{font-size:11pt;background:#fff;color:#000}
+  .band,.determ,.tool-bar{background:none}
+  .tool{border:1px solid #999}
+  .print-only{display:block}
+  section{padding:16px 0}
+  .titleblock{padding:0 0 16px}
+  .verdict-grid{grid-template-columns:1fr 300px}
+  .tscroll{overflow:visible}
+  table{min-width:0;font-size:9pt}
+  tr,li,fieldset,.notice,.determ{page-break-inside:avoid}
+  h1{font-size:22pt}
+  h2{font-size:15pt}
+  h3{font-size:12pt}
+  .exec{font-size:11pt}
+  a{text-decoration:none;color:#000}
+}
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <div class="mast-in">
+    <a class="back" href="../../">Nikhila Veeramalla</a>
+    <span class="toolname">Clinical AI Readiness Assessment</span>
+  </div>
+</div>
+
+<main class="wrap">
+
+<header class="titleblock">
+  <div class="eyebrow">
+    <span class="bar"></span>
+    <span class="label">Lab · Instrument 01 · Governance</span>
+  </div>
+  <h1>Clinical AI Readiness Assessment</h1>
+  <p class="stand">The artefact an AI product manager owns before a model is trained: a go/no-go that scores six weighted risk dimensions, applies the Cures Act CDS carve-out test and IMDRF categorisation, and gates on blockers no score can override.</p>
+</header>
+
+<section>
+  <div class="sec-head">
+    <span class="label"><span class="num">01</span> &nbsp;How it works</span>
+    <div><h2>Six dimensions, two statutory tests, one gate.</h2></div>
+  </div>
+  <ol class="steps">
+    <li>
+      <span class="n">Step 01 — Instrument</span>
+      <div class="b">Thirty-four questions across six risk dimensions, each answered on a fixed four-point ordinal scale (0–3). Questions carry an internal weight of 1–3; dimensions carry an external weight summing to 100. A dimension sub-score is the weighted answer total over the weighted maximum of the questions actually answered, expressed 0–100.</div>
+    </li>
+    <li>
+      <span class="n">Step 02 — Cures Act CDS test</span>
+      <div class="b">The four conditions of the 21st Century Cures Act clinical decision support carve-out, codified at FD&amp;C Act §520(o)(1)(E), are evaluated as conjunctive gates. Software is outside the device definition only if <strong>all four</strong> hold. Any failure returns <strong>likely SaMD — regulatory pathway required</strong>, naming the condition that failed. FDA's September 2022 CDS guidance factors — directive output, and time-critical decision-making defeating independent review — are applied as the conservative reading.</div>
+    </li>
+    <li>
+      <span class="n">Step 03 — IMDRF categorisation</span>
+      <div class="b">The IMDRF SaMD risk framework (N12) matrix is applied independently of the US device determination: <em>significance of the information to the healthcare decision</em> (treat or diagnose / drive clinical management / inform clinical management) crossed with <em>state of the healthcare situation</em> (critical / serious / non-serious), returning Category I–IV.</div>
+    </li>
+    <li>
+      <span class="n">Step 04 — Blocker gating</span>
+      <div class="b">Seven hard blockers are declared in advance as conditions over answers, not as score thresholds. Several are compound — the safety blocker requires autonomous action <em>and</em> irreversibility <em>and</em> high severity together. If any fires, the verdict is <strong>DO NOT PROCEED</strong> irrespective of the weighted total.</div>
+    </li>
+    <li>
+      <span class="n">Step 05 — Banding and floors</span>
+      <div class="b">Absent a blocker, the weighted total bands to PROCEED (≥78), PROCEED WITH CONDITIONS (58–77) or REDESIGN REQUIRED (&lt;58). Two floors then apply: any dimension below 55 caps the verdict at PROCEED WITH CONDITIONS; any dimension below 40 caps it at REDESIGN REQUIRED. A strong average cannot bury a collapsed dimension.</div>
+    </li>
+    <li>
+      <span class="n">Step 06 — Register and stability</span>
+      <div class="b">Every failing answer emits a risk register row with an authored, question-specific mitigation and a computed severity index. A seeded sensitivity analysis (mulberry32, fixed seed) then perturbs every answered question by −1/0/+1 across 500 runs and reports how often the verdict survives assessor disagreement.</div>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="label"><span class="num">02</span> &nbsp;The instrument</span>
+    <div>
+      <h2>Assess a use case.</h2>
+      <p class="deck">Loaded with a sepsis early-warning use case. Two further worked examples are provided. All three are answered realistically; two of the three land on a verdict their total score alone would not predict.</p>
+    </div>
+  </div>
+
+  <div class="notice hard">
+    <span class="k">Clinical safety and honesty</span>
+    <p><strong>Demonstration only. Not validated for clinical or compliance use.</strong> Synthetic records. No real patient data is used anywhere in this tool. The worked examples are illustrative constructions, not descriptions of any real programme, product or vendor. This instrument is not a regulatory determination, not a certified compliance control, and not a medical device. It does not substitute for qualified regulatory counsel, an institutional review board, a privacy office, or the accountable clinical governance body — each of which must reach its own conclusion.</p>
+  </div>
+
+  <div class="tool">
+
+    <div class="tool-bar noprint">
+      <div class="grp">
+        <span class="k">Worked examples</span>
+        <button class="act" type="button" id="ex-sepsis" aria-pressed="false">Sepsis early warning</button>
+        <button class="act" type="button" id="ex-scribe" aria-pressed="false">Ambient scribe</button>
+        <button class="act" type="button" id="ex-carecm" aria-pressed="false">Care-management targeting</button>
+      </div>
+      <div class="grp">
+        <button class="act" type="button" id="btn-clear">Clear all</button>
+        <button class="act" type="button" id="btn-expand">Expand all</button>
+        <button class="act solid" type="button" id="btn-print">Print / PDF</button>
+      </div>
+    </div>
+
+    <!-- ============ RESULTS ============ -->
+    <div class="pad">
+      <div class="blockhead">
+        <span class="label">Result</span>
+        <span class="label" id="case-name">Sepsis early-warning model</span>
+      </div>
+      <div class="verdict-grid">
+        <div>
+          <div id="verdict-badge" class="badge">—</div>
+          <div class="score-line">
+            <span class="fig tnum" id="total-score">—</span>
+            <span class="of">weighted total / 100</span>
+          </div>
+          <p class="vsum" id="verdict-note"></p>
+          <p class="vsum" id="case-blurb"></p>
+          <div class="meter">
+            <svg id="completeness-bar" viewBox="0 0 100 6" preserveAspectRatio="none" role="img" aria-label="Assessment completeness"><rect x="0" y="0" width="100" height="6" fill="#f3f1eb"></rect></svg>
+            <span class="label meterk" id="completeness-k">—</span>
+          </div>
+        </div>
+        <div class="radar">
+          <div id="radar-holder"></div>
+          <p class="weakest" id="weakest-note"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ WHY BLOCKERS OVERRIDE ============ -->
+    <div class="pad sub">
+      <span class="label">Why a high total cannot override a blocker</span>
+      <p class="vsum">A weighted total is a measure of <em>how much</em> of a programme is in good order. A blocker is a statement that a specific thing is <em>absent</em> — a lawful basis for the data, a human between the model and an irreversible act, an owner for a regulated function. Those are not quantities that other good work can substitute for. Averaging lets a strong data posture pay for a missing kill switch, and it lets a well-run programme carry a disqualifying defect at a comfortable-looking 73/100. So the blockers are evaluated first and independently, and the total is reported alongside the verdict rather than producing it. The care-management example below is exactly this case: it is the <strong>highest-scoring</strong> of the three worked examples and the only one that must not ship.</p>
+    </div>
+
+    <!-- ============ DIMENSIONS + WEIGHTS ============ -->
+    <div class="pad sub">
+      <div class="blockhead">
+        <span class="label">Dimension profile and weights</span>
+        <span class="label">Weights sum to 100</span>
+      </div>
+      <div class="tscroll">
+        <table id="dim-table">
+          <thead><tr>
+            <th scope="col">Dimension</th><th scope="col">Weight</th><th scope="col">Sub-score</th>
+            <th scope="col" class="barcell">Profile</th><th scope="col">Answered</th><th scope="col">Contribution</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="clear-note">Weights are not equal by design. Patient safety and regulatory posture together carry half the instrument because a failure in either is discovered late, reaches a patient or a regulator, and cannot be retrofitted. Monitoring carries the smallest single weight but has the widest reach — it is the dimension that catches the other five after go-live.</p>
+    </div>
+
+    <!-- ============ REGULATORY ============ -->
+    <div class="pad sub">
+      <span class="label">Regulatory posture — Cures Act <span class="nocaps">§520(o)(1)(E)</span> CDS carve-out</span>
+      <p class="vsum">All four conditions must hold for the software function to sit outside the device definition. These are conjunctive: one failure is sufficient to place the function inside device regulation.</p>
+      <div class="gates" id="cures-gates"></div>
+      <div class="determ">
+        <span class="k">Determination (conservative reading)</span>
+        <div class="v" id="determ-v">—</div>
+        <div class="why" id="determ-why"></div>
+      </div>
+      <div class="determ">
+        <span class="k">IMDRF SaMD risk category (N12)</span>
+        <div class="v" id="imdrf-v">—</div>
+        <div class="why" id="imdrf-why"></div>
+      </div>
+    </div>
+
+    <!-- ============ BLOCKERS ============ -->
+    <div class="pad sub">
+      <div class="blockhead">
+        <span class="label">Hard blockers</span>
+        <span class="label" id="blocker-count">—</span>
+      </div>
+      <div id="blockers-holder"></div>
+    </div>
+
+    <!-- ============ RISK REGISTER ============ -->
+    <div class="pad sub">
+      <div class="blockhead">
+        <span class="label">Generated risk register</span>
+        <span class="label" id="register-count">—</span>
+      </div>
+      <p class="vsum">A row is emitted for any answer scoring 0 or 1, and for any answer scoring 2 on a critical (weight-3) question. Severity index = (3 − answer) × question weight × (dimension weight ÷ 10). Mitigations are authored per question, not generated from a template. Rows marked <strong>inherent</strong> characterise the hazard the use case carries rather than a gap in the plan — they are excluded from the conditions named in the executive summary, because you cannot design away the severity of sepsis, only the operating point at which you meet it.</p>
+      <div class="tscroll">
+        <table id="risk-table">
+          <thead><tr>
+            <th scope="col">Sev</th><th scope="col">Idx</th><th scope="col">Risk</th>
+            <th scope="col">Dimension</th><th scope="col">Recommended mitigation</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ EXEC SUMMARY ============ -->
+    <div class="pad sub">
+      <span class="label">Executive summary — for the steering committee</span>
+      <p class="exec" id="exec-summary"></p>
+    </div>
+
+    <!-- ============ STABILITY ============ -->
+    <div class="pad sub">
+      <div class="blockhead">
+        <span class="label">Verdict stability under assessor disagreement</span>
+        <span class="label">Seeded — mulberry32</span>
+      </div>
+      <p class="vsum">Ordinal judgements are not measurements. Five hundred perturbed copies of this assessment are scored, each answered question independently shifted by −1, 0 or +1 level (clamped to 0–3) using a fixed seed, so the figures below are reproducible on every load. If the verdict is fragile, it should be read as a range rather than a decision.</p>
+      <div class="tscroll">
+        <table class="narrow" id="stab-table">
+          <thead><tr><th scope="col">Verdict under perturbation</th><th scope="col">Runs</th><th scope="col">Share</th><th scope="col" class="barcell">Profile</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="clear-note" id="stab-note"></p>
+    </div>
+
+    <!-- ============ PRINT-ONLY ANSWER RECORD ============ -->
+    <div class="pad sub print-only">
+      <span class="label">Answer record</span>
+      <table id="record-table">
+        <thead><tr><th scope="col">Dimension</th><th scope="col">Question</th><th scope="col">Answer recorded</th><th scope="col">Score</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- ============ QUESTIONNAIRE ============ -->
+    <div class="qform" id="qform"></div>
+
+  </div>
+</section>
+
+<section>
+  <div class="sec-head">
+    <span class="label"><span class="num">03</span> &nbsp;Method &amp; limitations</span>
+    <div><h2>What it catches, and what it cannot.</h2></div>
+  </div>
+  <div>
+    <p>What it catches is the failure a scoring average hides: a programme 73% in good order and still disqualified. It encodes the Cures Act carve-out's four conjunctive conditions and the IMDRF N12 matrix, and gates on seven pre-declared blockers rather than the total.</p>
+    <p>What it misses is most of what a determination requires. FDA's 2022 CDS guidance reads these conditions more narrowly than the statute alone suggests; where a reading is contested — is encounter audio a signal from a signal acquisition system? — the tool takes the conservative view and flags it rather than resolving it. It has no view on state law, the EU AI Act, 42 CFR Part 2, or payer contracts. Two honest assessors will differ by a level on most questions, which is why stability is reported.</p>
+    <p>A real deployment adds what this cannot produce: a counsel determination memo, an IRB submission, subgroup validation on local data, and a signed governance record.</p>
+    <p>A human stays in the loop at three points. The regulatory determination belongs to qualified counsel. The severity judgements belong to the accountable clinician. The decision to accept residual risk belongs to a named executive — never to a number.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Nikhila Veeramalla — AI Product Manager, Healthcare</span>
+    <span>Demonstration only · Synthetic data · Not for clinical use</span>
+  </div>
+</footer>
+
+<script>
+"use strict";
+
+/* ================= deterministic PRNG (no nondeterministic randomness anywhere) ================= */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+var SEED = 20260802;
+
+/* ================= palette (SVG needs literals, not custom properties) ========== */
+var C = { paper:"#fbfaf8", band:"#f3f1eb", ink:"#14120f", body:"#3c3630", muted:"#6f675d",
+          rule:"#e2ded4", rule2:"#cfc9bc", accent:"#6b4e12", ok:"#1f5d3a", warn:"#8a5a12", bad:"#8c2f24" };
+
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ================= the instrument ================= */
+var DIMS = [
+{
+  id:"safety", n:"Patient Safety & Clinical Impact", short:"Safety", w:28,
+  why:"Weighted highest because an error in this dimension reaches a patient. Nothing in the other five dimensions compensates for it.",
+  qs:[
+    { id:"s_reach", w:3, short:"Error reach",
+      t:"Can a model error reach the patient without a human seeing it first?",
+      o:["Yes — output can trigger an order, alert-driven action or documented result with no human review",
+         "Effectively yes — a human sees it under time pressure with no realistic ability to override",
+         "A clinician reviews before any action, but the review is a confirm-click on a pre-filled action",
+         "No — a clinician must independently decide and act; the output is advisory only"],
+      mit:"Make the output non-actionable until a named clinician has recorded a decision, and stop pre-filling the action being reviewed — a pre-checked order set converts review into assent.",
+      mit0:"Do not connect this output to any downstream action path. Route it to a review queue with no order-signing capability until a human read step exists and is enforced in software." },
+    { id:"s_hitl", w:3, short:"Human checkpoint",
+      t:"Is there a defined, named human checkpoint between output and clinical action?",
+      o:["None defined","Informal — depends on local practice, not specified anywhere",
+         "Defined in the workflow specification but not enforced by the system",
+         "Defined and enforced — nothing downstream fires without an attributed human decision"],
+      mit:"Write the checkpoint into the workflow specification and enforce it in software: no downstream action without a user identity, a timestamp and a recorded accept or reject.",
+      mit0:"Name the role that holds the checkpoint before any further build. An undefined checkpoint is not a checkpoint; it is an assumption that someone will be watching." },
+    { id:"s_rev", w:3, short:"Reversibility",
+      t:"If the recommendation is wrong and acted upon, how reversible is the resulting decision?",
+      o:["Irreversible within the clinical time window — drug given, procedure begun, discharge executed",
+         "Reversible only through a further invasive or high-cost intervention",
+         "Reversible with delay and non-trivial cost — readmission, repeat test, rework",
+         "Trivially reversible before harm — a draft the clinician edits, a worklist re-ordering"],
+      mit:"Move the intervention point earlier so the model acts on a reversible artefact — a flag, a draft, a queue position — rather than on the irreversible act, and require a second confirmation for anything not reversible inside the clinical time window." },
+    { id:"s_fn", w:2, short:"False-negative severity", inh:true,
+      t:"Worst realistic outcome of a missed case (false negative)?",
+      o:["Death or permanent serious harm plausible","Serious but recoverable harm, or materially prolonged stay",
+         "Minor harm or delay","No clinical harm — inconvenience or rework only"],
+      mit:"Set the operating point from the cost of a miss rather than from headline accuracy: pre-specify the minimum sensitivity or recall the clinical owner will accept, publish the false-alarm or omission volume that choice produces, and have that trade signed rather than assumed." },
+    { id:"s_fp", w:2, short:"False-positive severity", inh:true,
+      t:"Worst realistic outcome of a false alarm (false positive)?",
+      o:["Harmful intervention likely — unnecessary drug, procedure or isolation",
+         "Invasive workup, significant resource diversion or patient distress",
+         "An extra low-risk test or some clinician time","Negligible — a dismissed suggestion"],
+      mit:"Quantify false positives in absolute terms — how many per unit per day, and what each one costs downstream in workup, clinician time or patient distress — then tune to a positive predictive value the receiving service has agreed in writing that it can absorb." },
+    { id:"s_vuln", w:1, short:"Vulnerable populations",
+      t:"Does the use case touch populations needing extra protection (paediatric, obstetric, ICU, psychiatric, cognitively impaired)?",
+      o:["Yes, and no population-specific safety analysis exists","Yes; analysis is planned but not done",
+         "Yes, and a documented population-specific safety analysis exists",
+         "No — and the exclusion is enforced in the deployment cohort, not merely intended"],
+      mit:"Either exclude the cohort with an enforced filter in the deployment population, or complete a population-specific safety analysis with subgroup performance evidence before including them." }
+  ]
+},
+{
+  id:"reg", n:"Regulatory Posture", short:"Regulatory", w:22,
+  why:"Weighted second because a misclassification surfaces after launch, when it is most expensive to unwind. The first four questions are the statutory conditions themselves.",
+  qs:[
+    { id:"r_signal", w:3, short:"Cures test — signal inputs",
+      t:"Condition (i). Does the function acquire, process or analyse a medical image, an in vitro diagnostic signal, or a pattern or signal from a signal acquisition system?",
+      o:["Yes — it directly processes a medical image, an IVD signal, or a waveform from a signal-acquisition system",
+         "In part — it consumes features derived from such a signal",
+         "Borderline — the input is captured signal of another kind (for example encounter audio) whose status under this clause is untested",
+         "No — inputs are charted medical information, narrative documentation or clinician-entered data only"],
+      mit:"Enumerate every input and its provenance in the regulatory determination, and get the borderline inputs ruled on in writing before launch rather than after.",
+      mit0:"Condition (i) fails on image, IVD or waveform inputs. Stop treating this as CDS: open a device pathway, and scope the submission now rather than discovering the requirement at commercialisation." },
+    { id:"r_medinfo", w:2, short:"Cures test — medical information",
+      t:"Condition (ii). Is the function displaying, analysing or printing medical information about the patient, including guidelines and peer-reviewed literature?",
+      o:["No — the primary function is something else, such as controlling a device or driving therapy",
+         "Partly — it also performs a materially non-informational function",
+         "Yes, with minor ancillary functions","Yes — that is precisely what it does"],
+      mit:"Separate the informational function from any non-informational function into distinct, independently describable software functions and assess each separately, as FDA expects for multiple-function products." },
+    { id:"r_recs", w:3, short:"Cures test — recommendation not directive",
+      t:"Condition (iii). Does the output provide recommendations to a health care professional, or a specific directive output?",
+      o:["A specific directive output — a single diagnosis, a dose, an order — or an output aimed at patients and caregivers rather than professionals",
+         "A single preferred output with no alternatives, aimed at a professional",
+         "It ranks options but strongly foregrounds one","A set of options with the supporting basis, for a professional to choose from"],
+      mit:"Change the output from a single foregrounded answer to a ranked set of options each carrying its own basis. A pre-checked order set is a directive in practice, whatever the screen text says.",
+      mit0:"A specific diagnostic or treatment directive, or an output aimed at patients rather than professionals, sits outside the carve-out. Treat the function as SaMD and open a regulatory pathway before further build." },
+    { id:"r_basis", w:3, short:"Cures test — independent review",
+      t:"Condition (iv). Can the health care professional independently review the basis for the recommendation?",
+      o:["No — the model is opaque; the clinician cannot reconstruct why",
+         "A global feature-importance summary only; no patient-level basis",
+         "Patient-level inputs and contributing factors are shown, but the logic and sources are not documented",
+         "Inputs, logic and sources are disclosed at patient level, sufficient for a clinician to reach the conclusion independently"],
+      mit:"Publish the patient-level basis: the input values used, their contribution, the reference source or logic, and the population the model was fitted on — enough that a clinician could reach the conclusion without the model.",
+      mit0:"Condition (iv) cannot be met by an opaque model. Either surface a patient-level, source-attributed basis or accept device status; there is no third option here." },
+    { id:"r_time", w:2, short:"Time-criticality",
+      t:"How time-critical is the decision the output supports? (FDA's 2022 CDS guidance treats time-critical decision-making as defeating independent review.)",
+      o:["Immediate — the clinician must act with no realistic opportunity to review the basis",
+         "Minutes — review is theoretically possible, practically rare",
+         "Hours — review is feasible within the workflow",
+         "Non-urgent — review is expected and has dedicated time"],
+      mit:"Move the output earlier in the clinical timeline so review is realistic, or accept that condition (iv) is not credibly met and plan for device status." },
+    { id:"r_owner", w:2, short:"Regulatory ownership",
+      t:"Who owns the regulatory assessment, and is it documented?",
+      o:["No one; no determination documented","An informal internal opinion, undocumented",
+         "A documented internal determination, not reviewed by regulatory counsel",
+         "Documented determination reviewed by qualified regulatory counsel, with a pathway defined if SaMD"],
+      mit:"Name a regulatory owner, produce a written determination against §520(o)(1)(E) and the 2022 CDS guidance, and have qualified counsel review it before launch rather than before audit.",
+      mit0:"No named owner means no determination will exist when it is needed. Assign the owner this week; this is a scheduling decision, not a budget one." }
+  ]
+},
+{
+  id:"data", n:"Data Provenance & Rights", short:"Data", w:16,
+  why:"Weighted third because an unlawfully obtained or improperly scoped training set cannot be remediated by better modelling — only by rebuilding.",
+  qs:[
+    { id:"d_basis", w:3, short:"Lawful basis",
+      t:"Is there a documented lawful basis for using this data to develop this model?",
+      o:["Unknown, scraped, or no documented basis","Vendor assertion only; no contract reviewed",
+         "A contractual basis exists but the secondary-use scope is ambiguous",
+         "Documented basis covering this specific use — consent, IRB approval or waiver, or an express permitted-use provision"],
+      mit:"Have the privacy office trace and record the basis for this specific use, dataset by dataset, and retire any source whose basis cannot be evidenced.",
+      mit0:"Stop development on this dataset. Establish a lawful basis before further training and document the chain of custody from source system to training set; a model built on an unlawful set is not fixable downstream." },
+    { id:"d_baa", w:3, short:"BAA coverage",
+      t:"Is the business associate relationship in place for every party that touches PHI?",
+      o:["Identifiable PHI is disclosed to a party with no executed BAA",
+         "A BAA is in negotiation while data is already flowing",
+         "An executed BAA exists but is silent on model training, retention or subcontractors",
+         "An executed BAA covers this processing end to end, or no PHI leaves the covered entity"],
+      mit:"Amend the BAA to name model training, log retention and subcontractor flow-down explicitly. Silence on those points is not permission, and it is where vendor terms usually diverge from the clinical assumption.",
+      mit0:"Halt the data flow now. Execute a BAA covering training, retention, logging and subcontractors before PHI moves again, and log the interim disclosure for breach assessment." },
+    { id:"d_deid", w:2, short:"De-identification / IRB",
+      t:"What is the de-identification or IRB posture for the development data?",
+      o:["Identifiable data used for development with no IRB approval, waiver or de-identification",
+         "Ad-hoc scrubbing with no documented method or expert determination",
+         "HIPAA Safe Harbor applied (45 CFR §164.514(b)(2), all eighteen identifier categories) but no residual re-identification risk assessment",
+         "Expert Determination under §164.514(b)(1), or IRB approval or waiver of authorisation on file, with a documented residual-risk assessment"],
+      mit:"Commission an Expert Determination, or add a documented re-identification risk assessment on top of Safe Harbor. Safe Harbor also requires no actual knowledge that the residual information could identify an individual — and free-text notes routinely carry identifiers the eighteen categories do not reach.",
+      mit0:"Do not use identifiable data for development without IRB approval or a waiver of authorisation. Apply Safe Harbor or obtain an Expert Determination first, and record the residual risk finding." },
+    { id:"d_second", w:2, short:"Secondary use",
+      t:"Is secondary use of this data for AI development permitted?",
+      o:["The stated purpose of collection does not cover AI development and no permission was sought",
+         "Arguably covered by broad language; not reviewed by counsel or the privacy office",
+         "Covered, but the deployment population differs from the population that consented",
+         "Expressly permitted for this purpose by consent, waiver or contract, reviewed by the privacy office"],
+      mit:"Reconcile the purpose of collection against the purpose of use in writing. Where the deployment population differs from the consented population, seek a fresh basis rather than reading the old one broadly." },
+    { id:"d_retain", w:2, short:"Retention and deletion",
+      t:"Is there a retention and deletion plan covering data, logs and model artefacts?",
+      o:["No retention schedule, no deletion path, and no way to honour a revocation",
+         "Retention defined for source data only; model artefacts and inference logs are indefinite",
+         "A schedule exists for data and logs, but there is no process for removing an individual's contribution from a trained model",
+         "Documented schedule for data, logs and model artefacts, with a defined and recorded response to revocation"],
+      mit:"Write one schedule spanning source data, feature stores, inference logs and model artefacts, and define the operational response to a revocation — exclusion, retraining, or a documented refusal with a stated reason." },
+    { id:"d_docs", w:1, short:"Provenance documentation",
+      t:"How well is the dataset documented?",
+      o:["No dataset documentation","Row counts and date range only",
+         "Source systems, extraction logic and known gaps documented",
+         "Full datasheet: source, collection context, inclusion and exclusion, known biases, missingness, versioning"],
+      mit:"Produce a dataset datasheet — source systems, extraction query, date range, inclusion and exclusion, missingness by field, known collection biases, and a version identifier referenced by every trained model." }
+  ]
+},
+{
+  id:"equity", n:"Bias & Equity", short:"Equity", w:13,
+  why:"Material and partly correctable after launch — but only where subgroup monitoring exists to detect it. Where the label itself encodes a disparity, nothing downstream corrects it.",
+  qs:[
+    { id:"e_repr", w:3, short:"Representativeness",
+      t:"Is the training population representative of the deployment population?",
+      o:["Training data is from a different health system, era or country and has not been compared to the deployment population",
+         "Same country, different case mix; no formal comparison performed",
+         "Comparison performed; material differences found and unmitigated",
+         "Comparison documented; distributions match, or differences are locally recalibrated"],
+      mit:"Run a distribution comparison between the training cohort and the named deployment cohort across age, sex, race and ethnicity, payer, primary language, comorbidity burden and care setting; recalibrate locally where they diverge and record the residual gap." },
+    { id:"e_sub", w:3, short:"Subgroup performance",
+      t:"Are subgroup performance metrics planned, with thresholds?",
+      o:["No subgroup analysis planned","Planned, but no minimum sample size or acceptance threshold defined",
+         "Planned for race, ethnicity and sex only, with thresholds",
+         "Pre-specified across race and ethnicity, sex, age, language, payer and disability status, with per-subgroup acceptance thresholds and adequate cell sizes"],
+      mit:"Pre-specify subgroup metrics and acceptance thresholds before validation runs, with minimum cell sizes. A subgroup too small to measure is a documented limitation, not a pass." },
+    { id:"e_proxy", w:3, short:"Proxy variable risk",
+      t:"Is there a known proxy-variable risk in the label or features?",
+      o:["A known harmful proxy is the label or a core feature — for example prior healthcare cost or utilisation standing in for clinical need",
+         "Proxies are present and unexamined",
+         "Proxies identified; mitigation planned but not tested",
+         "Label and features reviewed for proxy risk; harmful proxies removed or the label re-specified to a direct clinical measure"],
+      mit:"Audit every feature and the label for proxy risk — cost, utilisation, prior diagnosis coding, ZIP code, insurance status — and measure performance with each candidate proxy removed rather than reasoning about it.",
+      mit0:"Re-specify the label before anything else. Cost and utilisation encode access to care, not need; a model trained on them reproduces the existing disparity at scale and with an appearance of objectivity. Replace with a direct clinical outcome and revalidate from scratch." },
+    { id:"e_access", w:2, short:"Access and digital equity",
+      t:"Does the deployment depend on patient-side technology or language access?",
+      o:["Yes, and a material share of the population lacks it; unexamined",
+         "Known gaps, no mitigation","Gaps identified with partial mitigation, such as an interpreter workflow",
+         "Not patient-facing, or barriers assessed and mitigated with a non-digital fallback"],
+      mit:"Assess language, connectivity, device and literacy barriers in the actual deployment population, and provide a non-digital route that reaches the same standard of care rather than a degraded one." },
+    { id:"e_drift", w:2, short:"Subgroup drift monitoring",
+      t:"Is subgroup performance monitored for drift after launch?",
+      o:["No plan","Aggregate performance monitoring only","Subgroup monitoring at a fixed annual review",
+         "Continuous subgroup monitoring with pre-set alert thresholds and a named reviewer"],
+      mit:"Instrument subgroup performance as a monitored metric with alert thresholds and a named reviewer, not as an annual report. Disparities emerge between reviews and are attributed to case mix when found late." }
+  ]
+},
+{
+  id:"flow", n:"Workflow Fit & Adoption", short:"Workflow", w:11,
+  why:"Determines whether the model is used at all. A failure here is usually an adoption loss rather than a harm — but alert fatigue is a safety failure wearing an adoption costume.",
+  qs:[
+    { id:"w_land", w:3, short:"Where output lands",
+      t:"Where does the output land in the clinical workflow?",
+      o:["A standalone tool outside the EHR that no one is scheduled to open",
+         "An interruptive modal at an arbitrary point in the workflow",
+         "Inside the EHR, but in a passive tab the clinician must seek out",
+         "At the decision point, in the system already in use, at the moment the decision is made"],
+      mit:"Place the output at the decision point inside the system already in use. If the clinician has to open a second application, plan on the assumption that it will not be opened." },
+    { id:"w_alert", w:3, short:"Alert burden",
+      t:"What is the alert burden and fatigue risk?",
+      o:["Alerts added to a workflow already at or beyond fatigue thresholds, with no override analysis",
+         "Volume estimated; no threshold tuning or suppression logic",
+         "Volume modelled and tuned; no post-launch override-rate review planned",
+         "Volume modelled against current burden, thresholds tuned to a target PPV, suppression logic defined, override rate monitored"],
+      mit:"Measure the unit's current alert volume and override rate first, then set the threshold so this alert is a small addition to it. Commit to a post-launch override-rate review with a pre-agreed threshold at which the alert is withdrawn." },
+    { id:"w_acct", w:3, short:"Accountability",
+      t:"Who is accountable for acting on the output?",
+      o:["No one is named — 'the system flags it'","A role is named but not staffed or rostered",
+         "A named role with defined hours; gaps outside those hours",
+         "A named, rostered role accountable across all hours the model fires, with escalation"],
+      mit:"Name the role, roster it across every hour the model fires, and require documentation of non-action as well as action so that silence is auditable rather than ambiguous." },
+    { id:"w_fallb", w:2, short:"Fallback",
+      t:"What is the fallback when the system is unavailable?",
+      o:["None — the workflow depends on the model","Informal reversion to prior practice, undocumented",
+         "A documented downtime procedure, not rehearsed",
+         "Documented and rehearsed downtime procedure; the prior standard of care remains fully operable"],
+      mit:"Write and rehearse a downtime procedure, and keep the prior standard of care fully operable and periodically exercised, so that removing the model is an inconvenience rather than an incident." },
+    { id:"w_codes", w:1, short:"Clinician co-design",
+      t:"How involved were front-line clinicians in the design?",
+      o:["No end-user clinician has seen it","One clinical champion consulted",
+         "A clinical advisory group reviewed the design",
+         "Front-line clinicians co-designed it, with usability testing in a realistic setting"],
+      mit:"Run usability testing with front-line clinicians in a realistic setting before launch. A clinical champion is not a substitute for the people who receive the alert at three in the morning." }
+  ]
+},
+{
+  id:"gov", n:"Monitoring & Governance", short:"Governance", w:10,
+  why:"The smallest single weight and the widest reach: this is the dimension that catches the other five after go-live, when the assumptions in them start to fail.",
+  qs:[
+    { id:"g_local", w:3, short:"Local validation",
+      t:"Is there pre-deployment validation on local data?",
+      o:["Vendor-reported metrics only; no local validation",
+         "Local validation planned after launch","Retrospective local validation on a historical cohort",
+         "Retrospective local validation plus prospective silent validation, against pre-specified acceptance criteria"],
+      mit:"Validate on local data before launch — retrospective on your own historical cohort, then prospective silent running on the live population, against acceptance criteria agreed in advance rather than negotiated after the result." },
+    { id:"g_shadow", w:2, short:"Shadow mode",
+      t:"Is there a shadow-mode or silent period before exposure?",
+      o:["None — go live directly","A brief pilot with no comparison against outcomes",
+         "A shadow period defined, but no pre-specified exit criteria",
+         "Shadow period with pre-specified duration, sample size and quantitative go-live criteria"],
+      mit:"Define the shadow period by pre-specified sample size and quantitative go-live criteria rather than by calendar date, and publish the result to the governance group before any clinician sees an output." },
+    { id:"g_drift", w:2, short:"Drift detection",
+      t:"Is drift detected after deployment?",
+      o:["No drift detection","Manual periodic review of aggregate accuracy",
+         "Automated input-distribution monitoring only",
+         "Automated monitoring of input drift, output and prevalence shift, and outcome-linked performance, with alert thresholds"],
+      mit:"Monitor input distributions, output and prevalence shift, and outcome-linked performance together. Input drift alone misses the common case where the population is stable and the model has decayed against it." },
+    { id:"g_kill", w:3, short:"Owner and kill switch",
+      t:"Is there a named owner and a documented kill switch?",
+      o:["No named owner and no documented way to turn it off",
+         "Owner named, but disabling requires an engineering release",
+         "A documented switch one team can operate, never tested",
+         "Named accountable owner and a one-step disable an on-call clinician or operations lead can trigger, tested at least once"],
+      mit:"Test the disable path end to end, record who is authorised to use it, and rehearse it at least annually — an untested switch is a plan, not a control.",
+      mit0:"Name an accountable owner and build a one-step disable that an on-call clinician or operations lead can trigger without an engineering release. Test it before launch, not during the incident." },
+    { id:"g_incid", w:2, short:"Incident escalation",
+      t:"Is there an incident escalation path for suspected model-caused harm?",
+      o:["No defined path for reporting suspected model-related harm","A generic IT ticket queue",
+         "Routed into the existing patient-safety event system, with no model-specific triage",
+         "A model-specific pathway into the patient-safety system with defined triage, timelines and external reporting duties"],
+      mit:"Route suspected model-related harm into the existing patient-safety event system under a model-specific triage code, with defined response timelines and an explicit check on external reporting duties, including MDR reporting if the function is regulated." },
+    { id:"g_change", w:2, short:"Change control",
+      t:"How is change to the model controlled?",
+      o:["The vendor can update the model silently","Notification of updates, but no re-validation",
+         "Update notice with a re-validation commitment, but no version pinning",
+         "Version pinning, contractual change notice, and a re-validation gate before any new version reaches production"],
+      mit:"Pin the production model version, require contractual notice of any vendor change, and gate every new version behind the same local re-validation the original had to pass.",
+      mit0:"A silently updatable model invalidates your validation the moment it changes. Negotiate version pinning and change notice into the contract before renewal, and treat this as a commercial term, not a technical one." }
+  ]
+}
+];
+
+/* flat index */
+var QIDX = {}, ALLQ = [];
+DIMS.forEach(function(d){ d.qs.forEach(function(q){ QIDX[q.id] = { q:q, d:d }; ALLQ.push(q.id); }); });
+var NQ = ALLQ.length;
+
+/* ================= IMDRF N12 matrix ================= */
+var IMDRF_SIG = [
+  { v:"treat",  n:"Treat or diagnose" },
+  { v:"drive",  n:"Drive clinical management" },
+  { v:"inform", n:"Inform clinical management" }
+];
+var IMDRF_STATE = [
+  { v:"critical",   n:"Critical" },
+  { v:"serious",    n:"Serious" },
+  { v:"nonserious", n:"Non-serious" }
+];
+var IMDRF_MATRIX = {
+  critical:   { treat:"IV", drive:"III", inform:"II" },
+  serious:    { treat:"III", drive:"II",  inform:"I" },
+  nonserious: { treat:"II",  drive:"I",   inform:"I" }
+};
+
+/* ================= worked examples ================= */
+var EXAMPLES = {
+  sepsis: {
+    name:"Sepsis early-warning model",
+    blurb:"An EHR-embedded deterioration score for adult inpatient medical-surgical units. Fires a best-practice advisory to the bedside nurse and rapid-response team, with a sepsis order set attached. Inputs are charted vitals, labs and nursing observations — no waveforms.",
+    sig:"drive", state:"critical",
+    a:{ s_reach:2,s_hitl:3,s_rev:2,s_fn:0,s_fp:1,s_vuln:2,
+        r_signal:3,r_medinfo:3,r_recs:2,r_basis:2,r_time:2,r_owner:2,
+        d_basis:3,d_baa:3,d_deid:2,d_second:2,d_retain:2,d_docs:2,
+        e_repr:1,e_sub:2,e_proxy:2,e_access:3,e_drift:1,
+        w_land:3,w_alert:1,w_acct:2,w_fallb:2,w_codes:2,
+        g_local:2,g_shadow:2,g_drift:1,g_kill:2,g_incid:2,g_change:1 }
+  },
+  scribe: {
+    name:"Ambient documentation scribe",
+    blurb:"Ambient capture of the clinical encounter, drafting the note and suggesting E&M and diagnosis codes for the clinician to edit and sign. Clinically low-risk and workflow-native; the exposure sits almost entirely in data rights and change control. Note that a pure documentation function may sit outside device regulation under the administrative-support provision rather than the CDS carve-out — a determination this instrument does not attempt.",
+    sig:"inform", state:"serious",
+    a:{ s_reach:3,s_hitl:3,s_rev:3,s_fn:1,s_fp:1,s_vuln:1,
+        r_signal:2,r_medinfo:3,r_recs:3,r_basis:2,r_time:3,r_owner:2,
+        d_basis:1,d_baa:1,d_deid:1,d_second:1,d_retain:1,d_docs:1,
+        e_repr:2,e_sub:1,e_proxy:3,e_access:2,e_drift:1,
+        w_land:2,w_alert:3,w_acct:3,w_fallb:3,w_codes:2,
+        g_local:1,g_shadow:1,g_drift:1,g_kill:3,g_incid:2,g_change:0 }
+  },
+  carecm: {
+    name:"Care-management outreach targeting",
+    blurb:"A population-health model ranking patients for enrolment in a chronic-care management programme, trained on prior-year healthcare spend as the label for 'need'. Well-run on every operational dimension. The label is the problem, and no operational excellence reaches it.",
+    sig:"inform", state:"serious",
+    a:{ s_reach:2,s_hitl:2,s_rev:3,s_fn:1,s_fp:2,s_vuln:2,
+        r_signal:3,r_medinfo:3,r_recs:3,r_basis:2,r_time:3,r_owner:1,
+        d_basis:3,d_baa:3,d_deid:3,d_second:2,d_retain:2,d_docs:2,
+        e_repr:2,e_sub:1,e_proxy:0,e_access:2,e_drift:1,
+        w_land:3,w_alert:3,w_acct:3,w_fallb:3,w_codes:1,
+        g_local:2,g_shadow:2,g_drift:1,g_kill:2,g_incid:2,g_change:2 }
+  }
+};
+
+/* ================= state ================= */
+var ANS = {};
+var IMDRF = { sig:null, state:null };
+var CASE = { name:"—", blurb:"" };
+
+/* ================= blocker definitions ================= */
+var BLOCKERS = [
+  { id:"B1", n:"Autonomous action on an irreversible, high-severity decision",
+    test:function(a){
+      var noHuman = (a.s_reach === 0) || (a.s_hitl === 0);
+      var irrev   = (a.s_rev === 0 || a.s_rev === 1);
+      var severe  = (a.s_fn === 0) || (a.s_fp === 0);
+      return noHuman && irrev && severe;
+    },
+    why:"There is no human between the model and an act that cannot be undone, in a use case where being wrong can kill or permanently harm. This is the one configuration for which no amount of accuracy is an argument, because the failure has no recovery path." },
+  { id:"B2", n:"No documented lawful basis for the training data",
+    test:function(a){ return a.d_basis === 0; },
+    why:"A model is a derivative of its training set. If the basis for holding and using that set cannot be evidenced, the model inherits the defect and cannot be cured by re-testing, re-tuning or re-documenting after the fact." },
+  { id:"B3", n:"PHI disclosed to a party with no executed BAA",
+    test:function(a){ return a.d_baa === 0; },
+    why:"An unpermitted disclosure of protected health information has already occurred and is not remediated by proceeding. It becomes a breach assessment, not a design question." },
+  { id:"B4", n:"Identifiable data used for development with no IRB approval, waiver or de-identification",
+    test:function(a){ return a.d_deid === 0; },
+    why:"Research or development use of identifiable records without an approval, a waiver of authorisation, or a recognised de-identification method has no lawful footing to build on, whatever the clinical merit of the use case." },
+  { id:"B5", n:"A known harmful proxy is the label or a core feature",
+    test:function(a){ return a.e_proxy === 0; },
+    why:"When cost or utilisation stands in for clinical need, the label itself encodes unequal access to care. The model then reproduces that disparity at scale and with the authority of a number. Monitoring detects this; it does not correct it. Only re-specifying the label does." },
+  { id:"B6", n:"No owner and no kill switch for a system whose errors can cause serious harm",
+    test:function(a){
+      var severe = (a.s_fn !== null && a.s_fn !== undefined && a.s_fn <= 1) ||
+                   (a.s_fp !== null && a.s_fp !== undefined && a.s_fp <= 1);
+      return a.g_kill === 0 && severe;
+    },
+    why:"Every deployed model eventually needs to be stopped. Without a named owner and a tested way to stop it, the response to a live safety signal becomes an engineering release under pressure — the worst possible moment to write one." },
+  { id:"B7", n:"Likely a regulated device with no regulatory owner",
+    test:function(a, ctx){ return ctx.samd && a.r_owner === 0; },
+    why:"The CDS carve-out test has failed, so this function is likely a device — and no one owns the pathway. That combination does not fail at review; it fails at commercialisation, after the build is sunk." }
+];
+
+/* ================= scoring ================= */
+function assess(a, sig, state){
+  var dims = DIMS.map(function(d){
+    var got = 0, max = 0, answered = 0;
+    d.qs.forEach(function(q){
+      var v = a[q.id];
+      if (v === 0 || v > 0) { got += v * q.w; max += 3 * q.w; answered++; }
+    });
+    return { id:d.id, name:d.n, short:d.short, weight:d.w, why:d.why,
+             score: max > 0 ? (got / max) * 100 : null,
+             answered: answered, total: d.qs.length };
+  });
+
+  var wsum = 0, acc = 0;
+  dims.forEach(function(d){ if (d.score !== null){ wsum += d.weight; acc += d.weight * d.score; } });
+  var total = wsum > 0 ? acc / wsum : null;
+
+  var answeredCount = 0;
+  ALLQ.forEach(function(id){ var v = a[id]; if (v === 0 || v > 0) answeredCount++; });
+
+  /* --- Cures Act conditions: conjunctive gates --- */
+  function gate(qid, extra){
+    /* an overriding condition fails the gate even if the question itself is unanswered:
+       time-critical decision-making defeats independent review regardless of transparency */
+    if (extra && extra() === false) return "fail";
+    var v = a[qid];
+    if (!(v === 0 || v > 0)) return "undetermined";
+    return v >= 2 ? "pass" : "fail";
+  }
+  var cures = [
+    { k:"(i)",   q:"r_signal",
+      t:"Not intended for acquiring, processing or analysing a medical image, a signal from an in vitro diagnostic device, or a pattern or signal from a signal acquisition system.",
+      r:gate("r_signal"),
+      note:(a.r_signal === 2) ? "Passes only on the conservative reading. The input is captured signal whose status under this clause is untested — obtain a written determination." : "" },
+    { k:"(ii)",  q:"r_medinfo",
+      t:"Intended for displaying, analysing or printing medical information about a patient, or other medical information such as peer-reviewed studies and clinical practice guidelines.",
+      r:gate("r_medinfo"), note:"" },
+    { k:"(iii)", q:"r_recs",
+      t:"Intended for supporting or providing recommendations to a health care professional about prevention, diagnosis or treatment — not a specific directive output, and not aimed at patients or caregivers.",
+      r:gate("r_recs"),
+      note:(a.r_recs === 2) ? "Passes narrowly. FDA's 2022 guidance treats a single foregrounded output as directive in effect; a pre-checked order set is the common example." : "" },
+    { k:"(iv)",  q:"r_basis",
+      t:"Intended to enable the health care professional to independently review the basis for the recommendation, so that reliance on it is not the primary means of reaching the decision.",
+      r:gate("r_basis", function(){ return a.r_time === 0 ? false : true; }),
+      note:(a.r_time === 0)
+        ? "Failed on time-criticality. The clinician must act immediately, so independent review of the basis is not realistically available — FDA's 2022 guidance treats that as weighing against the carve-out."
+        : ((a.r_basis === 2) ? "Passes narrowly: patient-level factors are shown, but undocumented logic limits how independently a clinician can reconstruct the conclusion." : "") }
+  ];
+  var failed = cures.filter(function(g){ return g.r === "fail"; });
+  var undet  = cures.filter(function(g){ return g.r === "undetermined"; });
+  var samd = failed.length > 0;
+  var determ;
+  if (samd)            determ = { code:"samd", v:"Likely SaMD — regulatory pathway required" };
+  else if (undet.length) determ = { code:"undet", v:"Undetermined — conditions not yet answered" };
+  else                 determ = { code:"cds", v:"Likely outside FDA device regulation as CDS" };
+  determ.failed = failed; determ.undet = undet;
+
+  /* --- IMDRF N12 --- */
+  var imdrf = null;
+  if (sig && state && IMDRF_MATRIX[state] && IMDRF_MATRIX[state][sig]) {
+    imdrf = { cat: IMDRF_MATRIX[state][sig],
+              sig: (IMDRF_SIG.filter(function(x){return x.v===sig;})[0]||{}).n,
+              state: (IMDRF_STATE.filter(function(x){return x.v===state;})[0]||{}).n };
+  }
+
+  /* --- blockers --- */
+  var ctx = { samd:samd };
+  var fired = BLOCKERS.filter(function(b){ return b.test(a, ctx) === true; });
+
+  /* --- risk register --- */
+  var rows = [];
+  DIMS.forEach(function(d){
+    d.qs.forEach(function(q){
+      var v = a[q.id];
+      if (!(v === 0 || v > 0)) return;
+      var include = (v <= 1) || (v === 2 && q.w === 3);
+      if (!include) return;
+      var idx = (3 - v) * q.w * (d.w / 10);
+      var sev = idx >= 11 ? "HIGH" : (idx >= 5.5 ? "MEDIUM" : "LOW");
+      var isBlk = fired.some(function(b){
+        if (b.id === "B1") return ["s_reach","s_hitl","s_rev","s_fn","s_fp"].indexOf(q.id) >= 0 && v === 0;
+        if (b.id === "B2") return q.id === "d_basis" && v === 0;
+        if (b.id === "B3") return q.id === "d_baa" && v === 0;
+        if (b.id === "B4") return q.id === "d_deid" && v === 0;
+        if (b.id === "B5") return q.id === "e_proxy" && v === 0;
+        if (b.id === "B6") return q.id === "g_kill" && v === 0;
+        if (b.id === "B7") return q.id === "r_owner" && v === 0;
+        return false;
+      });
+      rows.push({
+        qid:q.id, short:q.short, dim:d.n, dimShort:d.short, v:v,
+        obs:q.o[v], idx:idx, sev:isBlk ? "BLOCKER" : sev, blocker:isBlk,
+        inherent:q.inh === true,
+        mit:(v === 0 && q.mit0) ? q.mit0 : q.mit
+      });
+    });
+  });
+  rows.sort(function(x, y){
+    if (x.blocker !== y.blocker) return x.blocker ? -1 : 1;
+    if (y.idx !== x.idx) return y.idx - x.idx;
+    return x.qid < y.qid ? -1 : 1;
+  });
+
+  /* --- verdict: blockers first, then bands, then dimension floors --- */
+  var verdict, tone, reason;
+  var scored = dims.filter(function(d){ return d.score !== null; });
+  var weakest = null;
+  scored.forEach(function(d){ if (!weakest || d.score < weakest.score) weakest = d; });
+
+  /* provisional band on whatever has been answered — reported, but not issued as a decision
+     unless the assessment is complete */
+  var provisional = total === null ? "—"
+    : (total >= 78 ? "PROCEED" : (total >= 58 ? "PROCEED WITH CONDITIONS" : "REDESIGN REQUIRED"));
+
+  if (answeredCount === 0) {
+    verdict = "INSUFFICIENT DATA"; tone = "b-warn";
+    reason = "No questions answered. Load a worked example or answer the instrument to produce a verdict.";
+  } else if (fired.length > 0) {
+    verdict = "DO NOT PROCEED"; tone = "b-bad";
+    reason = fired.length + (fired.length === 1 ? " hard blocker is present" : " hard blockers are present") +
+             ". The weighted total is reported for information only; it does not enter this verdict. " +
+             (answeredCount < NQ
+               ? "A blocker stands on its own evidence, so an incomplete assessment does not soften it."
+               : "");
+  } else if (answeredCount < NQ) {
+    /* no blocker has fired — but a question not yet answered may be the one that would fire it.
+       An unanswered question is not evidence of safety, so no proceed decision is issued. */
+    verdict = "ASSESSMENT INCOMPLETE"; tone = "b-warn";
+    reason = answeredCount + " of " + NQ + " questions answered. No blocker has fired on what has been answered, " +
+             "but this instrument will not issue a proceed decision on a partial assessment: an unanswered question is not evidence of safety, " +
+             "and four of the seven blockers sit on questions that may still be open. Provisional band on the answered subset only: " +
+             provisional + " at " + total.toFixed(0) + "/100.";
+  } else {
+    if (total >= 78)      { verdict = "PROCEED"; tone = "b-ok"; reason = "Weighted total is in the proceed band and no dimension floor is breached."; }
+    else if (total >= 58) { verdict = "PROCEED WITH CONDITIONS"; tone = "b-warn"; reason = "Weighted total is in the conditional band."; }
+    else                  { verdict = "REDESIGN REQUIRED"; tone = "b-bad"; reason = "Weighted total is below the conditional band."; }
+
+    if (weakest && weakest.score < 40 && verdict !== "REDESIGN REQUIRED") {
+      verdict = "REDESIGN REQUIRED"; tone = "b-bad";
+      reason = "Dimension floor applied: " + weakest.name + " scores " + weakest.score.toFixed(0) +
+               ", below the 40 floor. A total of " + total.toFixed(0) + " would otherwise have banded higher; a collapsed dimension is not averaged away.";
+    } else if (weakest && weakest.score < 55 && verdict === "PROCEED") {
+      verdict = "PROCEED WITH CONDITIONS"; tone = "b-warn";
+      reason = "Dimension floor applied: " + weakest.name + " scores " + weakest.score.toFixed(0) +
+               ", below the 55 floor, so the verdict is capped despite a total of " + total.toFixed(0) + ".";
+    }
+  }
+
+  return { dims:dims, total:total, answeredCount:answeredCount, cures:cures, determ:determ,
+           samd:samd, imdrf:imdrf, fired:fired, rows:rows, verdict:verdict, tone:tone,
+           reason:reason, weakest:weakest, provisional:provisional };
+}
+
+/* ================= sensitivity (seeded) ================= */
+function stability(a, sig, state){
+  var rnd = mulberry32(SEED);
+  var N = 500, tally = {}, base = assess(a, sig, state).verdict;
+  for (var i = 0; i < N; i++){
+    var p = {};
+    for (var k = 0; k < ALLQ.length; k++){
+      var id = ALLQ[k], v = a[id];
+      if (!(v === 0 || v > 0)) continue;
+      var r = rnd(), shift = (r < 0.25) ? -1 : (r < 0.75 ? 0 : 1);
+      var nv = v + shift; if (nv < 0) nv = 0; if (nv > 3) nv = 3;
+      p[id] = nv;
+    }
+    var vd = assess(p, sig, state).verdict;
+    tally[vd] = (tally[vd] || 0) + 1;
+  }
+  var out = Object.keys(tally).map(function(k){ return { v:k, n:tally[k], pct:(tally[k] / N) * 100 }; });
+  out.sort(function(x, y){ return y.n - x.n; });
+  return { base:base, runs:N, dist:out, hold:((tally[base] || 0) / N) * 100 };
+}
+
+/* ================= SVG helpers (attributes only — no inline style) ============== */
+function bandColour(v){ return v >= 78 ? C.ok : (v >= 58 ? C.warn : C.bad); }
+
+function barSVG(v, colour){
+  var w = Math.max(0, Math.min(100, v));
+  return '<svg viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="' + w.toFixed(0) + ' out of 100">' +
+    '<rect x="0" y="0" width="100" height="8" fill="' + C.band + '"></rect>' +
+    '<rect x="0" y="0" width="' + w.toFixed(2) + '" height="8" fill="' + colour + '"></rect>' +
+    '<rect x="0" y="0" width="100" height="8" fill="none" stroke="' + C.rule + '" stroke-width="1"></rect></svg>';
+}
+
+function radarSVG(dims){
+  var cx = 240, cy = 155, R = 108, LR = 132, n = 6;
+  function pt(i, rad){
+    var ang = (-90 + (360 / n) * i) * Math.PI / 180;
+    return [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)];
+  }
+  function poly(rad){
+    var p = [];
+    for (var i = 0; i < n; i++){ var q = pt(i, rad); p.push(q[0].toFixed(1) + "," + q[1].toFixed(1)); }
+    return p.join(" ");
+  }
+  var s = '<svg viewBox="0 0 480 330" role="img" aria-label="Radar profile across six risk dimensions">';
+  [0.25, 0.5, 0.75, 1].forEach(function(f){
+    s += '<polygon points="' + poly(R * f) + '" fill="none" stroke="' + C.rule + '" stroke-width="1"></polygon>';
+  });
+  for (var i = 0; i < n; i++){
+    var e = pt(i, R);
+    s += '<line x1="' + cx + '" y1="' + cy + '" x2="' + e[0].toFixed(1) + '" y2="' + e[1].toFixed(1) +
+         '" stroke="' + C.rule + '" stroke-width="1"></line>';
+  }
+  var pts = [];
+  for (var j = 0; j < n; j++){
+    var sc = dims[j].score === null ? 0 : dims[j].score;
+    var q2 = pt(j, R * (sc / 100));
+    pts.push(q2[0].toFixed(1) + "," + q2[1].toFixed(1));
+  }
+  s += '<polygon points="' + pts.join(" ") + '" fill="' + C.accent + '" fill-opacity="0.14" stroke="' +
+       C.accent + '" stroke-width="1.5"></polygon>';
+  for (var m = 0; m < n; m++){
+    var sc2 = dims[m].score === null ? 0 : dims[m].score;
+    var d2 = pt(m, R * (sc2 / 100));
+    s += '<rect x="' + (d2[0] - 2.5).toFixed(1) + '" y="' + (d2[1] - 2.5).toFixed(1) +
+         '" width="5" height="5" fill="' + bandColour(sc2) + '"></rect>';
+    var L = pt(m, LR);
+    var anchor = (m === 0 || m === 3) ? "middle" : (m === 1 || m === 2 ? "start" : "end");
+    s += '<text x="' + L[0].toFixed(1) + '" y="' + L[1].toFixed(1) + '" text-anchor="' + anchor +
+         '" font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.4" fill="' + C.muted + '">' +
+         esc(dims[m].short.toUpperCase()) + '</text>';
+    s += '<text x="' + L[0].toFixed(1) + '" y="' + (L[1] + 15).toFixed(1) + '" text-anchor="' + anchor +
+         '" font-family="IBM Plex Mono, monospace" font-size="14" fill="' + C.ink + '">' +
+         (dims[m].score === null ? "&#8212;" : dims[m].score.toFixed(0)) + '</text>';
+  }
+  s += '</svg>';
+  return s;
+}
+
+/* ================= questionnaire build ================= */
+function buildForm(){
+  var h = "";
+  DIMS.forEach(function(d, di){
+    h += '<details class="dim" id="det-' + d.id + '"' + (di === 0 ? " open" : "") + '>';
+    h += '<summary class="dimhead"><span class="tog" aria-hidden="true"></span>' +
+         '<span class="dname">' + esc(d.n) + '</span>' +
+         '<span class="dwt">Weight ' + d.w + '</span>' +
+         '<span class="dsc dsub" id="sum-' + d.id + '">&#8212;</span></summary>';
+    h += '<div class="dimbody"><p class="dimwhy">' + esc(d.why) + '</p>';
+
+    if (d.id === "reg"){
+      h += '<div class="classify"><div class="ck">Classification inputs — not scored</div>' +
+           '<p class="cn">These two selections drive the IMDRF N12 categorisation only. They describe the use case; they do not add to or subtract from any sub-score.</p>';
+      h += '<fieldset><legend><span class="qt">Significance of the information to the healthcare decision</span></legend><div class="opts">';
+      IMDRF_SIG.forEach(function(x, i){
+        h += '<label class="opt" data-cls="sig" data-val="' + x.v + '"><input type="radio" name="imdrf_sig" value="' + x.v +
+             '"><span class="ov">' + String.fromCharCode(97 + i) + '</span><span class="ot">' + esc(x.n) + '</span></label>';
+      });
+      h += '</div></fieldset>';
+      h += '<fieldset><legend><span class="qt">State of the healthcare situation or condition</span></legend><div class="opts">';
+      IMDRF_STATE.forEach(function(x, i){
+        h += '<label class="opt" data-cls="state" data-val="' + x.v + '"><input type="radio" name="imdrf_state" value="' + x.v +
+             '"><span class="ov">' + String.fromCharCode(97 + i) + '</span><span class="ot">' + esc(x.n) + '</span></label>';
+      });
+      h += '</div></fieldset></div>';
+    }
+
+    d.qs.forEach(function(q, qi){
+      h += '<fieldset><legend>' +
+           '<span class="qn">' + esc(d.short) + ' &#183; Q' + (qi + 1) + ' &#183; ' + esc(q.short) + '</span>' +
+           '<span class="qt">' + esc(q.t) + '</span>' +
+           '<span class="qw">Question weight ' + q.w + ' of 3</span></legend><div class="opts">';
+      q.o.forEach(function(opt, v){
+        h += '<label class="opt" data-q="' + q.id + '" data-v="' + v + '">' +
+             '<input type="radio" name="' + q.id + '" value="' + v + '">' +
+             '<span class="ov">' + v + '</span><span class="ot">' + esc(opt) + '</span></label>';
+      });
+      h += '</div></fieldset>';
+    });
+    h += '</div></details>';
+  });
+  document.getElementById("qform").innerHTML = h;
+
+  document.getElementById("qform").addEventListener("change", function(ev){
+    var el = ev.target;
+    if (el.name === "imdrf_sig"){ IMDRF.sig = el.value; }
+    else if (el.name === "imdrf_state"){ IMDRF.state = el.value; }
+    else if (QIDX[el.name]){ ANS[el.name] = parseInt(el.value, 10); }
+    else return;
+    CASE = { name:"Custom assessment", blurb:"" };
+    setPressed(null);
+    syncClasses(); render();
+  });
+}
+
+function syncClasses(){
+  var labels = document.querySelectorAll("#qform .opt");
+  for (var i = 0; i < labels.length; i++){
+    var el = labels[i], inp = el.querySelector("input");
+    if (inp && inp.checked) el.classList.add("is-on"); else el.classList.remove("is-on");
+  }
+}
+
+function paintForm(){
+  ALLQ.forEach(function(id){
+    var v = ANS[id];
+    var inputs = document.getElementsByName(id);
+    for (var i = 0; i < inputs.length; i++){
+      inputs[i].checked = (v === 0 || v > 0) ? (parseInt(inputs[i].value, 10) === v) : false;
+    }
+  });
+  ["imdrf_sig", "imdrf_state"].forEach(function(nm){
+    var want = nm === "imdrf_sig" ? IMDRF.sig : IMDRF.state;
+    var inputs = document.getElementsByName(nm);
+    for (var i = 0; i < inputs.length; i++) inputs[i].checked = (inputs[i].value === want);
+  });
+  syncClasses();
+}
+
+/* ================= executive summary ================= */
+/* lowercase for mid-sentence use, but never flatten an acronym such as BAA or IRB */
+function softLower(s){
+  return String(s).split(" ").map(function(w){
+    var bare = w.replace(/[^A-Za-z]/g, "");
+    if (bare.length > 1 && bare === bare.toUpperCase()) return w;
+    return w.charAt(0).toLowerCase() + w.slice(1);
+  }).join(" ");
+}
+
+function joinList(arr){
+  if (arr.length === 0) return "";
+  if (arr.length === 1) return arr[0];
+  if (arr.length === 2) return arr[0] + " and " + arr[1];
+  return arr.slice(0, -1).join("; ") + "; and " + arr[arr.length - 1];
+}
+
+function execSummary(R){
+  if (R.answeredCount === 0){
+    return "No answers are recorded, so there is nothing to brief. Load a worked example or complete the instrument.";
+  }
+  var name = CASE.name && CASE.name !== "—" ? CASE.name : "this use case";
+  var tot = R.total === null ? "—" : R.total.toFixed(0);
+  var comp = R.answeredCount + " of " + NQ + " questions answered";
+  var s = "";
+
+  var namedWeakest = false;
+
+  if (R.fired.length > 0){
+    var bl = R.fired.map(function(b){ return b.n.toLowerCase(); });
+    s += "My recommendation is that we do not proceed with " + name + " in its present form. ";
+    s += R.fired.length === 1
+      ? "One hard blocker is present: " + joinList(bl) + ". That alone is disqualifying. "
+      : R.fired.length + " hard blockers are present: " + joinList(bl) + ". Each is disqualifying on its own. ";
+    s += "The instrument returns a weighted total of " + tot +
+         (R.total >= 58
+           ? " out of 100, and I want the committee to notice that this is not a low score — it is what a competent programme with a disqualifying defect looks like. "
+           : " out of 100, which is consistent with the blocker rather than in tension with it. ");
+  } else if (R.verdict === "REDESIGN REQUIRED"){
+    s += "My recommendation is that we redesign " + name + " before committing further build capacity. ";
+    s += "The weighted total is " + tot + " out of 100. ";
+    if (R.weakest && R.weakest.score < 40){
+      s += "That total is misleading on its own: " + R.weakest.name.toLowerCase() + " scores " + R.weakest.score.toFixed(0) +
+           " out of 100, below the floor at which the instrument stops letting strong dimensions compensate for a collapsed one. It carries " +
+           R.weakest.weight + " per cent of the instrument. ";
+      namedWeakest = true;
+    }
+  } else if (R.verdict === "PROCEED WITH CONDITIONS"){
+    s += "My recommendation is that we proceed with " + name + " subject to conditions, at a weighted total of " + tot + " out of 100. ";
+    s += "No hard blocker is present, which is the threshold question, and the residual risk is addressable inside the plan rather than by abandoning it. ";
+  } else if (R.verdict === "PROCEED"){
+    s += "My recommendation is that we proceed with " + name + ", at a weighted total of " + tot + " out of 100, with no hard blocker present and no dimension below the floor. ";
+  } else if (R.verdict === "ASSESSMENT INCOMPLETE"){
+    s += "I am not able to bring a recommendation on " + name + " to this committee yet. " +
+         R.answeredCount + " of " + NQ + " questions are answered, and nothing in that subset has fired a blocker — but I would not read that as reassurance, because several of the blockers sit on questions still open. " +
+         "On the answered subset the provisional band is " + R.provisional + " at " + tot + " out of 100, which I am reporting as a direction of travel and not as a decision. ";
+  } else {
+    s += "There is insufficient input to brief a recommendation on " + name + ". ";
+  }
+
+  if (R.weakest && R.verdict !== "INSUFFICIENT DATA" && !namedWeakest){
+    s += "The weakest dimension is " + R.weakest.name.toLowerCase() + " at " + R.weakest.score.toFixed(0) +
+         " out of 100, carrying " + R.weakest.weight + " per cent of the instrument. ";
+  }
+
+  /* inherent-hazard rows characterise the use case rather than a remediable gap,
+     so they are reported separately and never presented as conditions to attach */
+  var inh = R.rows.filter(function(r){ return r.inherent && !r.blocker && r.v <= 1; });
+  var conds = R.rows.filter(function(r){ return !r.blocker && !r.inherent; }).slice(0, 3);
+
+  if (conds.length > 0){
+    var cl = conds.map(function(r){ return softLower(r.short) + " (" + softLower(r.dimShort) + ")"; });
+    var lead = R.fired.length > 0
+      ? ("Setting the blocker" + (R.fired.length === 1 ? "" : "s") + " aside, the highest-severity remediable exposure" + (cl.length === 1 ? " is " : "s are "))
+      : ("The highest-severity remediable exposure" + (cl.length === 1 ? " is " : "s are "));
+    s += lead + joinList(cl) + ". ";
+    s += "The first condition I would attach in writing is this. " + conds[0].mit + " ";
+  } else if (R.rows.length > 0){
+    s += "No remediable exposure clears the register's emission thresholds. ";
+  } else {
+    s += "The register is empty at the emission thresholds this instrument uses. ";
+  }
+
+  if (inh.length > 0){
+    s += "Separately, " + joinList(inh.map(function(r){ return softLower(r.short); })) +
+         (inh.length === 1 ? " is inherent to the use case" : " are inherent to the use case") +
+         ", not a gap in our plan: we choose the operating point, not the hazard. ";
+  }
+
+  if (R.determ.code === "samd"){
+    var fl = R.determ.failed.map(function(g){ return "condition " + g.k; });
+    s += "On regulatory posture, the Cures Act carve-out test fails at " + joinList(fl) +
+         ", so I am treating this as likely software as a medical device and I need a regulatory pathway owner named before the next gate. ";
+  } else if (R.determ.code === "cds"){
+    s += "On regulatory posture, all four Cures Act conditions hold on the conservative reading, so I expect this to sit outside device regulation as clinical decision support — subject to counsel, not to a scoring tool. ";
+  } else {
+    s += "The regulatory determination is incomplete: " + R.determ.undet.length +
+         " of the four Cures Act conditions are unanswered, and I would not take this to a build decision until they are. ";
+  }
+
+  if (R.imdrf){
+    s += "Independently of that, the IMDRF categorisation is Category " + R.imdrf.cat +
+         " (" + R.imdrf.sig.toLowerCase() + ", " + R.imdrf.state.toLowerCase() + " situation) — that is what our quality-system obligations track. ";
+  }
+
+  s += "This assessment reflects " + comp + ".";
+  return s;
+}
+
+/* ================= render ================= */
+function render(){
+  var R = assess(ANS, IMDRF.sig, IMDRF.state);
+
+  document.getElementById("case-name").textContent = CASE.name;
+
+  var vb = document.getElementById("verdict-badge");
+  vb.textContent = R.verdict;
+  vb.className = "badge " + R.tone;
+
+  document.getElementById("total-score").innerHTML = R.total === null ? "&#8212;" : R.total.toFixed(0);
+  document.getElementById("verdict-note").textContent = R.reason;
+  document.getElementById("case-blurb").textContent = CASE.blurb || "";
+
+  var pct = (R.answeredCount / NQ) * 100;
+  document.getElementById("completeness-bar").innerHTML =
+    '<rect x="0" y="0" width="100" height="6" fill="' + C.band + '"></rect>' +
+    '<rect x="0" y="0" width="' + pct.toFixed(2) + '" height="6" fill="' + C.accent + '"></rect>';
+  document.getElementById("completeness-k").textContent =
+    R.answeredCount + " of " + NQ + " answered · " + pct.toFixed(0) + "% complete" +
+    (R.answeredCount < NQ ? " · provisional" : "");
+
+  document.getElementById("radar-holder").innerHTML = radarSVG(R.dims);
+  document.getElementById("weakest-note").textContent = R.weakest
+    ? ("Weakest dimension: " + R.weakest.name + " at " + R.weakest.score.toFixed(0) + "/100. Unanswered dimensions plot at zero.")
+    : "No dimension has been answered yet.";
+
+  /* dimension table */
+  var tb = document.querySelector("#dim-table tbody"), h = "";
+  R.dims.forEach(function(d){
+    var sc = d.score === null ? null : d.score;
+    h += "<tr><td><span class=\"qs\">" + esc(d.name) + "</span><span class=\"obs\">" + esc(d.why) + "</span></td>" +
+         "<td class=\"tnum\">" + d.weight + "</td>" +
+         "<td class=\"tnum\">" + (sc === null ? "&#8212;" : sc.toFixed(0)) + "</td>" +
+         "<td class=\"barcell\">" + barSVG(sc === null ? 0 : sc, sc === null ? C.rule2 : bandColour(sc)) + "</td>" +
+         "<td class=\"tnum\">" + d.answered + " / " + d.total + "</td>" +
+         "<td class=\"tnum\">" + (sc === null ? "&#8212;" : ((d.weight * sc) / 100).toFixed(1)) + "</td></tr>";
+  });
+  tb.innerHTML = h;
+
+  /* cures gates */
+  var g = "";
+  R.cures.forEach(function(x){
+    var cls = x.r === "pass" ? "g-pass" : (x.r === "fail" ? "g-fail" : "g-und");
+    var txt = x.r === "pass" ? "Holds" : (x.r === "fail" ? "Fails" : "Unanswered");
+    g += '<div class="gate"><span class="gk">' + esc(x.k) + '</span>' +
+         '<span class="gt">' + esc(x.t) + (x.note ? '<span class="gnote">' + esc(x.note) + '</span>' : '') + '</span>' +
+         '<span class="gv ' + cls + '">' + txt + '</span></div>';
+  });
+  document.getElementById("cures-gates").innerHTML = g;
+
+  document.getElementById("determ-v").textContent = R.determ.v;
+  var dw;
+  if (R.determ.code === "samd"){
+    dw = "Failed condition" + (R.determ.failed.length > 1 ? "s " : " ") +
+         R.determ.failed.map(function(x){ return x.k; }).join(", ") +
+         ". The four conditions are conjunctive, so a single failure places the function inside the device definition. " +
+         "A regulatory pathway and a named owner are required before build continues. This is a screening result, not a determination.";
+  } else if (R.determ.code === "cds"){
+    dw = "All four conditions hold on the conservative reading applied here. That is a screening result only: the determination belongs to qualified regulatory counsel, " +
+         "and FDA's September 2022 CDS guidance reads several of these conditions more narrowly than the statutory text alone.";
+  } else {
+    dw = "Answer condition" + (R.determ.undet.length > 1 ? "s " : " ") +
+         R.determ.undet.map(function(x){ return x.k; }).join(", ") + " to complete the test. Until then no determination is available, conservative or otherwise.";
+  }
+  document.getElementById("determ-why").textContent = dw;
+
+  document.getElementById("imdrf-v").textContent = R.imdrf ? ("Category " + R.imdrf.cat) : "Not classified";
+  document.getElementById("imdrf-why").textContent = R.imdrf
+    ? (R.imdrf.sig + " × " + R.imdrf.state.toLowerCase() + " healthcare situation. IMDRF categorisation is a risk framework used by regulators internationally and by quality systems; it is independent of the US device determination above, and the two can legitimately diverge — a function outside US device regulation can still carry a high IMDRF category, which is what your quality obligations will track.")
+    : "Select both classification inputs in the regulatory dimension below to categorise this use case.";
+
+  /* blockers */
+  document.getElementById("blocker-count").textContent =
+    R.fired.length === 0 ? "None fired" : (R.fired.length + (R.fired.length === 1 ? " blocker" : " blockers") + " fired");
+  var bh;
+  if (R.fired.length === 0){
+    bh = '<p class="clear-note">No hard blocker fired. All seven were evaluated against the answers given, including the three compound conditions. ' +
+         'This is a necessary condition for any verdict other than DO NOT PROCEED, not a sufficient one — the banding and dimension floors still apply.</p>';
+  } else {
+    bh = '<ul class="blist">';
+    R.fired.forEach(function(b){
+      bh += '<li><span class="bk">' + esc(b.id) + '</span><span class="bt"><strong>' + esc(b.n) + '</strong>' +
+            '<span class="bwhy">' + esc(b.why) + '</span></span></li>';
+    });
+    bh += '</ul><p class="clear-note">Blockers are evaluated before the total is banded. A higher score does not clear them, because they describe something absent rather than something insufficient.</p>';
+  }
+  document.getElementById("blockers-holder").innerHTML = bh;
+
+  /* risk register */
+  var rt = document.querySelector("#risk-table tbody"), rh = "";
+  if (R.rows.length === 0){
+    rh = '<tr><td colspan="5">No answer fell below the emission thresholds. Either the assessment is genuinely strong, or too few questions have been answered to surface risk.</td></tr>';
+  } else {
+    R.rows.forEach(function(r){
+      var cls = r.sev === "BLOCKER" ? "s-blk" : (r.sev === "HIGH" ? "s-bad" : (r.sev === "MEDIUM" ? "s-warn" : "s-low"));
+      rh += "<tr><td><span class=\"sevcell\"><span class=\"sev " + cls + "\">" + r.sev + "</span>" +
+            (r.inherent ? "<span class=\"sev s-low\">Inherent</span>" : "") + "</span></td>" +
+            "<td class=\"tnum\">" + r.idx.toFixed(1) + "</td>" +
+            "<td><span class=\"qs\">" + esc(r.short) + "</span><span class=\"obs\">Recorded: " + esc(r.obs) + " (level " + r.v + " of 3)" +
+            (r.inherent ? " &#183; Inherent hazard of the use case, not a gap in the plan. The hazard cannot be designed away; the response to it can." : "") +
+            "</span></td>" +
+            "<td>" + esc(r.dim) + "</td>" +
+            "<td>" + esc(r.mit) + "</td></tr>";
+    });
+  }
+  rt.innerHTML = rh;
+  document.getElementById("register-count").textContent =
+    R.rows.length + (R.rows.length === 1 ? " row" : " rows") + " generated";
+
+  /* exec summary */
+  document.getElementById("exec-summary").textContent = execSummary(R);
+
+  /* stability */
+  var st = document.querySelector("#stab-table tbody"), sh = "";
+  if (R.answeredCount === 0){
+    sh = '<tr><td colspan="4">Nothing to perturb.</td></tr>';
+    document.getElementById("stab-note").textContent = "";
+  } else {
+    var S = stability(ANS, IMDRF.sig, IMDRF.state);
+    S.dist.forEach(function(x){
+      var col = x.v === S.base ? C.accent : C.rule2;
+      sh += "<tr><td>" + esc(x.v) + (x.v === S.base ? " (current)" : "") + "</td>" +
+            "<td class=\"tnum\">" + x.n + "</td>" +
+            "<td class=\"tnum\">" + x.pct.toFixed(1) + "%</td>" +
+            "<td class=\"barcell\">" + barSVG(x.pct, col) + "</td></tr>";
+    });
+    var alt = S.dist.filter(function(x){ return x.v !== S.base; })[0];
+    var note = "The current verdict survives in " + S.hold.toFixed(1) + "% of " + S.runs +
+      " perturbed runs. Above roughly 70% the verdict is robust to ordinary assessor disagreement; below that, read it as a range and resolve the contested answers before deciding. ";
+    if (S.hold < 70 && alt){
+      note += "This verdict is fragile: it moves to " + alt.v + " in " + alt.pct.toFixed(0) +
+        "% of runs, which means the assessment is sitting close to a boundary and a single disputed answer decides it. Identify which answers the reviewers disagree on and settle those first. ";
+    } else if (alt){
+      note += "The nearest alternative is " + alt.v + " at " + alt.pct.toFixed(0) + "% of runs. ";
+    }
+    note += "Seed " + SEED + ", so these figures are identical on every load.";
+    document.getElementById("stab-note").textContent = note;
+    st.innerHTML = sh;
+  }
+  if (R.answeredCount === 0) st.innerHTML = sh;
+
+  /* print-only answer record */
+  var pr = document.querySelector("#record-table tbody"), ph = "";
+  DIMS.forEach(function(d){
+    d.qs.forEach(function(q){
+      var v = ANS[q.id];
+      ph += "<tr><td>" + esc(d.short) + "</td><td>" + esc(q.short) + "</td><td>" +
+            ((v === 0 || v > 0) ? esc(q.o[v]) : "Not answered") + "</td><td class=\"tnum\">" +
+            ((v === 0 || v > 0) ? (v + " / 3") : "&#8212;") + "</td></tr>";
+    });
+  });
+  pr.innerHTML = ph;
+
+  /* dimension summary chips in the questionnaire headers */
+  R.dims.forEach(function(d){
+    var el = document.getElementById("sum-" + d.id);
+    if (el) el.innerHTML = (d.score === null ? "&#8212;" : d.score.toFixed(0) + " / 100");
+  });
+}
+
+/* ================= example loading ================= */
+function setPressed(id){
+  ["ex-sepsis", "ex-scribe", "ex-carecm"].forEach(function(b){
+    var el = document.getElementById(b);
+    if (el) el.setAttribute("aria-pressed", b === id ? "true" : "false");
+  });
+}
+
+function loadExample(key, btnId){
+  var ex = EXAMPLES[key];
+  ANS = {};
+  Object.keys(ex.a).forEach(function(k){ ANS[k] = ex.a[k]; });
+  IMDRF = { sig:ex.sig, state:ex.state };
+  CASE = { name:ex.name, blurb:ex.blurb };
+  setPressed(btnId);
+  paintForm();
+  render();
+}
+
+function clearAll(){
+  ANS = {}; IMDRF = { sig:null, state:null };
+  CASE = { name:"Blank assessment", blurb:"Nothing is answered. Every sub-score, the total and the verdict are withheld rather than defaulted to zero, because an unanswered question is not the same as a bad answer." };
+  setPressed(null);
+  paintForm();
+  render();
+}
+
+/* ================= boot ================= */
+buildForm();
+
+document.getElementById("ex-sepsis").addEventListener("click", function(){ loadExample("sepsis", "ex-sepsis"); });
+document.getElementById("ex-scribe").addEventListener("click", function(){ loadExample("scribe", "ex-scribe"); });
+document.getElementById("ex-carecm").addEventListener("click", function(){ loadExample("carecm", "ex-carecm"); });
+document.getElementById("btn-clear").addEventListener("click", clearAll);
+document.getElementById("btn-print").addEventListener("click", function(){ window.print(); });
+document.getElementById("btn-expand").addEventListener("click", function(){
+  var ds = document.querySelectorAll("details.dim");
+  var anyClosed = false;
+  for (var i = 0; i < ds.length; i++) if (!ds[i].open) anyClosed = true;
+  for (var j = 0; j < ds.length; j++) ds[j].open = anyClosed;
+  this.textContent = anyClosed ? "Collapse all" : "Expand all";
+});
+
+/* preload the worked example so the tool is populated on first paint */
+loadExample("sepsis", "ex-sepsis");
+</script>
+
+</body>
+</html>
