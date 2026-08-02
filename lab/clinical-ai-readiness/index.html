@@ -289,7 +289,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:56px}
     </li>
     <li>
       <span class="n">Step 02 — Cures Act CDS test</span>
-      <div class="b">The four conditions of the 21st Century Cures Act clinical decision support carve-out, codified at FD&amp;C Act §520(o)(1)(E), are evaluated as conjunctive gates. Software is outside the device definition only if <strong>all four</strong> hold. Any failure returns <strong>likely SaMD — regulatory pathway required</strong>, naming the condition that failed. FDA's September 2022 CDS guidance factors — directive output, and time-critical decision-making defeating independent review — are applied as the conservative reading.</div>
+      <div class="b">The four conditions of the 21st Century Cures Act clinical decision support carve-out, codified at FD&amp;C Act §520(o)(1)(E), are evaluated as conjunctive gates. A function sits outside the device definition <em>under this provision</em> only if <strong>all four</strong> hold; the other subparagraphs of §520(o)(1) carve out other software and are not tested here. Any failure returns <strong>likely SaMD — regulatory pathway required</strong>, naming the condition that failed. FDA's September 2022 CDS guidance factors — directive output, and time-critical decision-making defeating independent review — are applied as the conservative reading. Where a condition passes only on a contested reading, the pass is reported as narrow rather than as a clean hold.</div>
     </li>
     <li>
       <span class="n">Step 03 — IMDRF categorisation</span>
@@ -394,10 +394,10 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:56px}
     <!-- ============ REGULATORY ============ -->
     <div class="pad sub">
       <span class="label">Regulatory posture — Cures Act <span class="nocaps">§520(o)(1)(E)</span> CDS carve-out</span>
-      <p class="vsum">All four conditions must hold for the software function to sit outside the device definition. These are conjunctive: one failure is sufficient to place the function inside device regulation.</p>
+      <p class="vsum">All four conditions must hold for the software function to sit outside the device definition under this provision. These are conjunctive: one failure is sufficient to place the function inside device regulation.</p>
       <div class="gates" id="cures-gates"></div>
       <div class="determ">
-        <span class="k">Determination (conservative reading)</span>
+        <span class="k">Determination — screening result, not a legal determination</span>
         <div class="v" id="determ-v">—</div>
         <div class="why" id="determ-why"></div>
       </div>
@@ -479,7 +479,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:56px}
   </div>
   <div>
     <p>What it catches is the failure a scoring average hides: a programme 73% in good order and still disqualified. It encodes the Cures Act carve-out's four conjunctive conditions and the IMDRF N12 matrix, and gates on seven pre-declared blockers rather than the total.</p>
-    <p>What it misses is most of what a determination requires. FDA's 2022 CDS guidance reads these conditions more narrowly than the statute alone suggests; where a reading is contested — is encounter audio a signal from a signal acquisition system? — the tool takes the conservative view and flags it rather than resolving it. It has no view on state law, the EU AI Act, 42 CFR Part 2, or payer contracts. Two honest assessors will differ by a level on most questions, which is why stability is reported.</p>
+    <p>What it misses is most of what a determination requires. FDA's 2022 CDS guidance reads these conditions more narrowly than the statute alone suggests; where a reading is contested — is encounter audio a signal from a signal acquisition system? — the tool does not resolve it. The borderline answer passes the gate, but the pass is reported as narrow and the determination says so, because the conservative reading would fail that condition and only counsel can settle which reading applies. It has no view on state law, the EU AI Act, 42 CFR Part 2, or payer contracts. Two honest assessors will differ by a level on most questions, which is why stability is reported.</p>
     <p>A real deployment adds what this cannot produce: a counsel determination memo, an IRB submission, subgroup validation on local data, and a signed governance record.</p>
     <p>A human stays in the loop at three points. The regulatory determination belongs to qualified counsel. The severity judgements belong to the accountable clinician. The decision to accept residual risk belongs to a named executive — never to a number.</p>
   </div>
@@ -849,8 +849,11 @@ var IMDRF = { sig:null, state:null };
 var CASE = { name:"—", blurb:"" };
 
 /* ================= blocker definitions ================= */
+/* qs lists every question a blocker's test reads, so the instrument can state how many
+   blockers still rest on an unanswered question instead of asserting a fixed number */
 var BLOCKERS = [
   { id:"B1", n:"Autonomous action on an irreversible, high-severity decision",
+    qs:["s_reach","s_hitl","s_rev","s_fn","s_fp"],
     test:function(a){
       var noHuman = (a.s_reach === 0) || (a.s_hitl === 0);
       var irrev   = (a.s_rev === 0 || a.s_rev === 1);
@@ -859,18 +862,23 @@ var BLOCKERS = [
     },
     why:"There is no human between the model and an act that cannot be undone, in a use case where being wrong can kill or permanently harm. This is the one configuration for which no amount of accuracy is an argument, because the failure has no recovery path." },
   { id:"B2", n:"No documented lawful basis for the training data",
+    qs:["d_basis"],
     test:function(a){ return a.d_basis === 0; },
     why:"A model is a derivative of its training set. If the basis for holding and using that set cannot be evidenced, the model inherits the defect and cannot be cured by re-testing, re-tuning or re-documenting after the fact." },
   { id:"B3", n:"PHI disclosed to a party with no executed BAA",
+    qs:["d_baa"],
     test:function(a){ return a.d_baa === 0; },
     why:"An unpermitted disclosure of protected health information has already occurred and is not remediated by proceeding. It becomes a breach assessment, not a design question." },
   { id:"B4", n:"Identifiable data used for development with no IRB approval, waiver or de-identification",
+    qs:["d_deid"],
     test:function(a){ return a.d_deid === 0; },
     why:"Research or development use of identifiable records without an approval, a waiver of authorisation, or a recognised de-identification method has no lawful footing to build on, whatever the clinical merit of the use case." },
   { id:"B5", n:"A known harmful proxy is the label or a core feature",
+    qs:["e_proxy"],
     test:function(a){ return a.e_proxy === 0; },
     why:"When cost or utilisation stands in for clinical need, the label itself encodes unequal access to care. The model then reproduces that disparity at scale and with the authority of a number. Monitoring detects this; it does not correct it. Only re-specifying the label does." },
   { id:"B6", n:"No owner and no kill switch for a system whose errors can cause serious harm",
+    qs:["g_kill","s_fn","s_fp"],
     test:function(a){
       var severe = (a.s_fn !== null && a.s_fn !== undefined && a.s_fn <= 1) ||
                    (a.s_fp !== null && a.s_fp !== undefined && a.s_fp <= 1);
@@ -878,6 +886,7 @@ var BLOCKERS = [
     },
     why:"Every deployed model eventually needs to be stopped. Without a named owner and a tested way to stop it, the response to a live safety signal becomes an engineering release under pressure — the worst possible moment to write one." },
   { id:"B7", n:"Likely a regulated device with no regulatory owner",
+    qs:["r_owner","r_signal","r_medinfo","r_recs","r_basis","r_time"],
     test:function(a, ctx){ return ctx.samd && a.r_owner === 0; },
     why:"The CDS carve-out test has failed, so this function is likely a device — and no one owns the pathway. That combination does not fail at review; it fails at commercialisation, after the build is sunk." }
 ];
@@ -915,7 +924,7 @@ function assess(a, sig, state){
     { k:"(i)",   q:"r_signal",
       t:"Not intended for acquiring, processing or analysing a medical image, a signal from an in vitro diagnostic device, or a pattern or signal from a signal acquisition system.",
       r:gate("r_signal"),
-      note:(a.r_signal === 2) ? "Passes only on the conservative reading. The input is captured signal whose status under this clause is untested — obtain a written determination." : "" },
+      note:(a.r_signal === 2) ? "Passes on the permissive reading only. The input is captured signal of a kind whose status under this clause is untested; the conservative reading fails condition (i) and places the function inside the device definition. Obtain a written determination before relying on this pass." : "" },
     { k:"(ii)",  q:"r_medinfo",
       t:"Intended for displaying, analysing or printing medical information about a patient, or other medical information such as peer-reviewed studies and clinical practice guidelines.",
       r:gate("r_medinfo"), note:"" },
@@ -932,12 +941,15 @@ function assess(a, sig, state){
   ];
   var failed = cures.filter(function(g){ return g.r === "fail"; });
   var undet  = cures.filter(function(g){ return g.r === "undetermined"; });
+  /* a condition that passes only because a contested answer was given the benefit of the doubt
+     is not a clean hold, and the determination must not be reported as though it were */
+  var narrow = cures.filter(function(g){ return g.r === "pass" && g.note; });
   var samd = failed.length > 0;
   var determ;
   if (samd)            determ = { code:"samd", v:"Likely SaMD — regulatory pathway required" };
   else if (undet.length) determ = { code:"undet", v:"Undetermined — conditions not yet answered" };
   else                 determ = { code:"cds", v:"Likely outside FDA device regulation as CDS" };
-  determ.failed = failed; determ.undet = undet;
+  determ.failed = failed; determ.undet = undet; determ.narrow = narrow;
 
   /* --- IMDRF N12 --- */
   var imdrf = null;
@@ -950,6 +962,10 @@ function assess(a, sig, state){
   /* --- blockers --- */
   var ctx = { samd:samd };
   var fired = BLOCKERS.filter(function(b){ return b.test(a, ctx) === true; });
+  /* counted, not asserted: how many blockers still read a question nobody has answered */
+  var openBlockers = BLOCKERS.filter(function(b){
+    return b.qs.some(function(qid){ var v = a[qid]; return !(v === 0 || v > 0); });
+  }).length;
 
   /* --- risk register --- */
   var rows = [];
@@ -1011,9 +1027,13 @@ function assess(a, sig, state){
        An unanswered question is not evidence of safety, so no proceed decision is issued. */
     verdict = "ASSESSMENT INCOMPLETE"; tone = "b-warn";
     reason = answeredCount + " of " + NQ + " questions answered. No blocker has fired on what has been answered, " +
-             "but this instrument will not issue a proceed decision on a partial assessment: an unanswered question is not evidence of safety, " +
-             "and four of the seven blockers sit on questions that may still be open. Provisional band on the answered subset only: " +
-             provisional + " at " + total.toFixed(0) + "/100.";
+             "but this instrument will not issue a proceed decision on a partial assessment: an unanswered question is not evidence of safety" +
+             (openBlockers === BLOCKERS.length
+               ? ", and every one of the seven blockers still reads a question nobody has answered. "
+               : (openBlockers > 0
+                   ? ", and " + openBlockers + " of the seven blockers still read a question nobody has answered. "
+                   : ". Every question a blocker reads has now been answered, but the questions still open move the total and the dimension floors. ")) +
+             "Provisional band on the answered subset only: " + provisional + " at " + total.toFixed(0) + "/100.";
   } else {
     if (total >= 78)      { verdict = "PROCEED"; tone = "b-ok"; reason = "Weighted total is in the proceed band and no dimension floor is breached."; }
     else if (total >= 58) { verdict = "PROCEED WITH CONDITIONS"; tone = "b-warn"; reason = "Weighted total is in the conditional band."; }
@@ -1031,8 +1051,8 @@ function assess(a, sig, state){
   }
 
   return { dims:dims, total:total, answeredCount:answeredCount, cures:cures, determ:determ,
-           samd:samd, imdrf:imdrf, fired:fired, rows:rows, verdict:verdict, tone:tone,
-           reason:reason, weakest:weakest, provisional:provisional };
+           samd:samd, imdrf:imdrf, fired:fired, openBlockers:openBlockers, rows:rows,
+           verdict:verdict, tone:tone, reason:reason, weakest:weakest, provisional:provisional };
 }
 
 /* ================= sensitivity (seeded) ================= */
@@ -1214,7 +1234,7 @@ function execSummary(R){
   if (R.answeredCount === 0){
     return "No answers are recorded, so there is nothing to brief. Load a worked example or complete the instrument.";
   }
-  var name = CASE.name && CASE.name !== "—" ? CASE.name : "this use case";
+  var name = (CASE.name && CASE.name !== "—") ? ("the " + softLower(CASE.name)) : "this use case";
   var tot = R.total === null ? "—" : R.total.toFixed(0);
   var comp = R.answeredCount + " of " + NQ + " questions answered";
   var s = "";
@@ -1222,7 +1242,7 @@ function execSummary(R){
   var namedWeakest = false;
 
   if (R.fired.length > 0){
-    var bl = R.fired.map(function(b){ return b.n.toLowerCase(); });
+    var bl = R.fired.map(function(b){ return softLower(b.n); });
     s += "My recommendation is that we do not proceed with " + name + " in its present form. ";
     s += R.fired.length === 1
       ? "One hard blocker is present: " + joinList(bl) + ". That alone is disqualifying. "
@@ -1235,7 +1255,7 @@ function execSummary(R){
     s += "My recommendation is that we redesign " + name + " before committing further build capacity. ";
     s += "The weighted total is " + tot + " out of 100. ";
     if (R.weakest && R.weakest.score < 40){
-      s += "That total is misleading on its own: " + R.weakest.name.toLowerCase() + " scores " + R.weakest.score.toFixed(0) +
+      s += "That total is misleading on its own: " + softLower(R.weakest.name) + " scores " + R.weakest.score.toFixed(0) +
            " out of 100, below the floor at which the instrument stops letting strong dimensions compensate for a collapsed one. It carries " +
            R.weakest.weight + " per cent of the instrument. ";
       namedWeakest = true;
@@ -1247,14 +1267,17 @@ function execSummary(R){
     s += "My recommendation is that we proceed with " + name + ", at a weighted total of " + tot + " out of 100, with no hard blocker present and no dimension below the floor. ";
   } else if (R.verdict === "ASSESSMENT INCOMPLETE"){
     s += "I am not able to bring a recommendation on " + name + " to this committee yet. " +
-         R.answeredCount + " of " + NQ + " questions are answered, and nothing in that subset has fired a blocker — but I would not read that as reassurance, because several of the blockers sit on questions still open. " +
+         R.answeredCount + " of " + NQ + " questions are answered, and nothing in that subset has fired a blocker — but I would not read that as reassurance" +
+         (R.openBlockers > 0
+           ? ", because " + R.openBlockers + " of the seven blockers still read a question nobody has answered. "
+           : ": every question a blocker reads is now answered, but the questions still open move the total and the dimension floors. ") +
          "On the answered subset the provisional band is " + R.provisional + " at " + tot + " out of 100, which I am reporting as a direction of travel and not as a decision. ";
   } else {
     s += "There is insufficient input to brief a recommendation on " + name + ". ";
   }
 
   if (R.weakest && R.verdict !== "INSUFFICIENT DATA" && !namedWeakest){
-    s += "The weakest dimension is " + R.weakest.name.toLowerCase() + " at " + R.weakest.score.toFixed(0) +
+    s += "The weakest dimension is " + softLower(R.weakest.name) + " at " + R.weakest.score.toFixed(0) +
          " out of 100, carrying " + R.weakest.weight + " per cent of the instrument. ";
   }
 
@@ -1287,7 +1310,13 @@ function execSummary(R){
     s += "On regulatory posture, the Cures Act carve-out test fails at " + joinList(fl) +
          ", so I am treating this as likely software as a medical device and I need a regulatory pathway owner named before the next gate. ";
   } else if (R.determ.code === "cds"){
-    s += "On regulatory posture, all four Cures Act conditions hold on the conservative reading, so I expect this to sit outside device regulation as clinical decision support — subject to counsel, not to a scoring tool. ";
+    s += "On regulatory posture, all four Cures Act conditions hold on the reading applied here, so I expect this to sit outside device regulation as clinical decision support — subject to counsel, not to a scoring tool. ";
+    if (R.determ.narrow.length > 0){
+      s += "I would not present that as settled: " +
+           joinList(R.determ.narrow.map(function(g){ return "condition " + g.k; })) +
+           (R.determ.narrow.length === 1 ? " passes narrowly on a contested reading, and the conservative reading of it would make this a device. "
+                                         : " pass narrowly on contested readings, and the conservative reading of any one of them would make this a device. ");
+    }
   } else {
     s += "The regulatory determination is incomplete: " + R.determ.undet.length +
          " of the four Cures Act conditions are unanswered, and I would not take this to a build decision until they are. ";
@@ -1361,8 +1390,17 @@ function render(){
          ". The four conditions are conjunctive, so a single failure places the function inside the device definition. " +
          "A regulatory pathway and a named owner are required before build continues. This is a screening result, not a determination.";
   } else if (R.determ.code === "cds"){
-    dw = "All four conditions hold on the conservative reading applied here. That is a screening result only: the determination belongs to qualified regulatory counsel, " +
-         "and FDA's September 2022 CDS guidance reads several of these conditions more narrowly than the statutory text alone.";
+    dw = "All four conditions hold on the reading applied here. ";
+    if (R.determ.narrow.length > 0){
+      dw += "Condition" + (R.determ.narrow.length > 1 ? "s " : " ") +
+            R.determ.narrow.map(function(x){ return x.k; }).join(", ") +
+            (R.determ.narrow.length > 1 ? " pass" : " passes") +
+            " narrowly rather than cleanly — see the notes above. The conservative reading of " +
+            (R.determ.narrow.length > 1 ? "any one of them" : "that condition") +
+            " fails the test and places the function inside the device definition, so this hold should not be relied on without a written determination. ";
+    }
+    dw += "That is a screening result only: the determination belongs to qualified regulatory counsel, " +
+          "and FDA's September 2022 CDS guidance reads several of these conditions more narrowly than the statutory text alone.";
   } else {
     dw = "Answer condition" + (R.determ.undet.length > 1 ? "s " : " ") +
          R.determ.undet.map(function(x){ return x.k; }).join(", ") + " to complete the test. Until then no determination is available, conservative or otherwise.";

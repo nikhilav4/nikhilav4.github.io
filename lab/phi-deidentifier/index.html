@@ -249,7 +249,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px;margin-top:0}
       <span class="label"><span class="num">01</span> &nbsp;How it works</span>
       <div>
         <h2>Six passes, no black box.</h2>
-        <p class="deck">Every rule below runs in your browser on the text in the box. Nothing is sent anywhere and nothing is pre-computed.</p>
+        <p class="deck">Every rule below runs in your browser on the text in the box. The text you paste is never transmitted — no request carries it off this page — and nothing is pre-computed. The page itself loads webfonts from Google; your note does not.</p>
       </div>
     </div>
     <div class="steps">
@@ -1201,12 +1201,16 @@ function riskModel(kept, plans, mode, text){
   else if (k < 11){ band = "MODERATE"; chip = "warn"; }
   else { band = "LOW"; chip = "ok"; }
 
+  /* numBand is where k alone falls. band is the reported band after the
+     date-of-service penalty. They are kept separate so nothing on the page
+     ever states a numeric range that the printed k contradicts. */
+  var numBand = band;
   var downgraded = false;
   if (serviceFull && band === "LOW"){ band = "MODERATE"; chip = "warn"; downgraded = true; }
   else if (serviceFull && band === "MODERATE"){ band = "HIGH"; chip = "bad"; downgraded = true; }
 
   return {
-    qis: qis, k: k, band: band, chip: chip, geoKey: geoKey, geoVal: geoVal, N: N,
+    qis: qis, k: k, band: band, numBand: numBand, chip: chip, geoKey: geoKey, geoVal: geoVal, N: N,
     geoBasis: POP[geoKey].basis, sexCue: sexCue,
     serviceFull: serviceFull, serviceYear: serviceYear, downgraded: downgraded,
     zipRestricted: sawZipRestricted
@@ -1226,10 +1230,15 @@ function fmtK(k){
   if (k < 10) return k.toFixed(1);
   return Math.round(k).toLocaleString("en-US");
 }
+/* The reciprocal form is only printed when it reproduces p exactly. Rounding
+   0.007 to "1 / 143" would print an equation that does not evaluate to the k
+   printed beside it (6,700,000 x 0.50 x 1/143 = 23,427, not 23,450), which
+   would break the page's own promise that the arithmetic can be checked. */
 function fmtP(p){
   if (p >= 0.1) return p.toFixed(2);
   var inv = Math.round(1 / p);
-  return "1 / " + inv.toLocaleString("en-US");
+  if (inv > 0 && 1 / inv === p) return "1 / " + inv.toLocaleString("en-US");
+  return String(p);
 }
 
 var $ = function(id){ return document.getElementById(id); };
@@ -1325,7 +1334,11 @@ function analyse(){
   $("r-k").textContent   = "k ≈ " + fmtK(r.k);
   var chip = $("r-chip");
   chip.className = "chip " + r.chip;
-  chip.textContent = r.band + " — " + (r.band === "HIGH" ? "k below 5" : r.band === "MODERATE" ? "k 5 to 11" : "k at or above 11");
+  /* When the band has been penalised for date linkage it no longer describes
+     a k range, so it must not claim one — k is printed directly above it. */
+  chip.textContent = r.band + " — " + (r.downgraded
+    ? "date-of-service linkage, one step worse than k alone"
+    : r.band === "HIGH" ? "k below 5" : r.band === "MODERATE" ? "k 5 to under 11" : "k at or above 11");
 
   var rb = "";
   rb += "<tr><td>Geography</td><td>" + escHtml(r.geoVal) + '</td><td class="n">population ' + r.N.toLocaleString("en-US") + "</td><td>" + escHtml(r.geoBasis) + "</td></tr>";
@@ -1350,15 +1363,18 @@ function analyse(){
   } else {
     s = "Under " + methodName + ", " + (names.length ? names.length + " person-level quasi-identifier" + (names.length === 1 ? "" : "s") + " survive" + (names.length === 1 ? "s" : "") + " — " + names.join(", ") + " — " : "no person-level quasi-identifiers survive, ") +
         "against a released geography of " + r.geoVal + ". " +
-        "Modelled over a population of " + r.N.toLocaleString("en-US") + " (" + r.geoBasis + "), the expected equivalence class is about " + fmtK(r.k) + " people, which places this record in the " + r.band + " band.";
+        "Modelled over a population of " + r.N.toLocaleString("en-US") + " (" + r.geoBasis + "), the expected equivalence class is about " + fmtK(r.k) + " people, which places this record in the " + r.numBand + " band on k alone.";
   }
   if (r.zipRestricted) s += " The ZIP prefix in this note is on the restricted-population list, so it was zeroed rather than retained — which is why the geographic denominator falls back to a wider unit.";
-  if (r.serviceFull) s += " Full service dates also survive. Visit dates are not in a voter roll, but they are known to anyone present at the encounter and to anyone who read a local news report, so the band is downgraded one step for date-of-service linkage.";
+  if (r.serviceFull) s += " Full service dates also survive. Visit dates are not in a voter roll, but they are known to anyone present at the encounter and to anyone who read a local news report" +
+    (r.downgraded
+      ? ", so the reported band is moved one step to " + r.band + " for date-of-service linkage. That penalty, not k, is why the band reads worse than the number above it."
+      : ", which is an aggravating factor here; the band is already " + r.band + " and cannot be moved further.");
   else if (r.serviceYear) s += " The service year " + r.serviceYear + " survives; a year alone narrows a cohort but is not a population attribute, so it is reported rather than scored.";
   if (!r.sexCue) s += " No sex cue was found; if the note were rewritten with a pronoun, k would halve.";
   $("r-sentence").textContent = s;
 
-  drawMeter(r.k, r.band);
+  drawMeter(r.k, r.numBand, r.downgraded ? r.band : null);
 
   /* ---- human review queue ---- */
   var pool = kept.map(function(d, ix){ return {d:d, p:plans[ix]}; })
@@ -1384,7 +1400,7 @@ function analyse(){
 }
 
 /* ---- inline SVG risk meter — generated from the data, no library ---- */
-function drawMeter(k, band){
+function drawMeter(k, numBand, penalisedBand){
   var svg = $("r-meter");
   var W = 720, X0 = 48, X1 = 680, Y = 46;
   function xOf(v){
@@ -1417,9 +1433,18 @@ function drawMeter(k, band){
   var mx = xOf(k);
   parts.push('<line x1="' + mx.toFixed(1) + '" y1="' + (Y-16) + '" x2="' + mx.toFixed(1) + '" y2="' + (Y+4) + '" stroke="var(--ink)" stroke-width="1"></line>');
   parts.push('<polygon points="' + (mx-5).toFixed(1) + ',' + (Y+4) + ' ' + (mx+5).toFixed(1) + ',' + (Y+4) + ' ' + mx.toFixed(1) + ',' + (Y+13) + '" fill="var(--accent)"></polygon>');
-  var anchor = mx < 110 ? "start" : (mx > W - 110 ? "end" : "middle");
-  var lx = mx < 110 ? X0 : (mx > W - 110 ? X1 : mx);
-  parts.push('<text class="mk" x="' + lx.toFixed(1) + '" y="' + (Y+50) + '" text-anchor="' + anchor + '">THIS RECORD · k ≈ ' + fmtK(k) + " · " + band + "</text>");
+  /* The marker sits at k, so it is labelled with the band k alone gives; any
+     date-linkage penalty is named as a separate step rather than silently
+     relabelling a marker that is standing in the green zone. */
+  var label = "THIS RECORD · k ≈ " + fmtK(k) + " · " + numBand +
+              (penalisedBand ? " → " + penalisedBand + " WITH DATE LINKAGE" : "");
+  /* ~6.8px per glyph at 11px IBM Plex Mono; keep the label inside the axis. */
+  var half = label.length * 3.4;
+  var anchor = "middle", lx = mx;
+  if (mx - half < X0){ anchor = "start"; lx = X0; }
+  else if (mx + half > X1){ anchor = "end"; lx = X1; }
+  /* fmtK can return "<0.01", which would corrupt the SVG if injected raw. */
+  parts.push('<text class="mk" x="' + lx.toFixed(1) + '" y="' + (Y+50) + '" text-anchor="' + anchor + '">' + escHtml(label) + "</text>");
 
   svg.innerHTML = parts.join("");
 }
