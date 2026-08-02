@@ -108,7 +108,9 @@ h1 .family{font-style:italic;color:var(--accent)}
 }
 .intro{margin-top:24px;max-width:37rem;color:var(--body)}
 .intro + .intro{margin-top:16px}
-.hero-acts{display:flex;flex-wrap:wrap;gap:12px;margin-top:40px}
+.workauth{margin-top:24px;padding:12px 0 0;border-top:1px solid var(--rule);font-size:14px;color:var(--muted);max-width:37rem}
+.workauth strong{color:var(--accent);font-weight:500}
+.hero-acts{display:flex;flex-wrap:wrap;gap:12px;margin-top:32px}
 
 /* portrait */
 .plate{align-self:start}
@@ -188,8 +190,9 @@ section{padding:96px 0;scroll-margin-top:72px}
 .edu-row .inst{margin-top:8px;color:var(--muted);font-size:14px}
 
 /* ---------------- contact ---------------- */
-.contact-grid{display:grid;grid-template-columns:repeat(3,1fr);margin-top:40px;border-top:1px solid var(--rule)}
-@media(max-width:760px){.contact-grid{grid-template-columns:1fr}}
+.contact-grid{display:grid;grid-template-columns:repeat(4,1fr);margin-top:40px;border-top:1px solid var(--rule)}
+@media(max-width:900px){.contact-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.contact-grid{grid-template-columns:1fr}}
 .cline{padding:24px 24px 24px 0;border-bottom:1px solid var(--rule)}
 .cline + .cline{border-left:1px solid var(--rule);padding-left:24px}
 @media(max-width:760px){.cline + .cline{border-left:0;padding-left:0}}
@@ -249,6 +252,7 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px}
       <p class="role rise">AI product manager for clinical software, trained first as a dentist.</p>
       <p class="intro rise">I lead AI product and delivery at ToothSure, where I took the clinical learning platform from an idea to a working product. AI-augmented workflows cut our project cycle time by 40% and conserved a quarter of the early-stage budget.</p>
       <p class="intro rise">Before this I practised dentistry and worked in health information. That is why I build clinical AI that clinicians will actually adopt and that holds up under HIPAA — the two places healthcare AI products usually fail.</p>
+      <p class="workauth rise"><strong>US work-authorized</strong> on F-1 STEM OPT &mdash; no visa sponsorship required for three years.</p>
       <div class="hero-acts rise">
         <a class="act solid" href="Nikhila_Veeramalla_Resume.pdf" download>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -525,6 +529,10 @@ footer{border-top:1px solid var(--rule);padding:24px 0 40px}
       <div class="cline rise">
         <div class="k">Telephone</div>
         <div class="v"><a href="tel:+13132136057">(313) 213-6057</a></div>
+      </div>
+      <div class="cline rise">
+        <div class="k">Work authorization</div>
+        <div class="v">F-1 STEM OPT &mdash; no sponsorship required</div>
       </div>
       <div class="cline rise">
         <div class="k">LinkedIn</div>
